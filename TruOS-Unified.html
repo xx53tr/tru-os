@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TruOS">
+<title>TruOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   SHELL — Tokens & layout
+═══════════════════════════════════════════ */
+:root {
+  --glass:        rgba(255,255,255,0.07);
+  --glass-border: rgba(255,255,255,0.12);
+  --glass-hi:     rgba(255,255,255,0.18);
+  --bg:           #08090a;
+  --amber:        #f5a623;
+  --purple:       #9e61ff;
+  --red:          #ff4757;
+  --red-dim:      rgba(255,71,87,0.12);
+  --green:        #2ed573;
+  --blue:         #1e90ff;
+  --text:         #ffffff;
+  --muted:        rgba(255,255,255,0.45);
+  --sans:         'Syne', sans-serif;
+  --mono:         'Space Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow-x: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(245,166,35,0.18) 0%, transparent 42%),
+    radial-gradient(circle at 88% 82%, rgba(158,97,255,0.16) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, rgba(30,144,255,0.06) 0%, transparent 50%);
+  filter: blur(70px);
+  animation: meshShift 22s ease-in-out infinite alternate;
+}
+@keyframes meshShift {
+  0%   { transform: scale(1) rotate(0deg); }
+  100% { transform: scale(1.25) rotate(6deg); }
+}
+
+#main-content { min-height: 100dvh; padding-bottom: 90px; }
+
+/* ── Shell Nav ── */
+.shell-nav {
+  position: fixed; bottom: 0;
+  width: 100%; max-width: 480px;
+  background: rgba(8,9,10,0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--glass-border);
+  display: grid; grid-template-columns: repeat(4,1fr);
+  padding: 10px 0 max(16px, env(safe-area-inset-bottom));
+  z-index: 900;
+}
+.nav-tab {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  cursor: pointer; opacity: 0.32; transition: opacity 0.2s;
+}
+.nav-tab.active { opacity: 1; }
+.nav-tab svg { width: 18px; height: 18px; stroke: var(--muted); }
+.nav-tab.active svg { stroke: var(--amber); }
+.nav-label { font-family: var(--mono); font-size: 7px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.nav-tab.active .nav-label { color: var(--amber); }
+
+/* ── Shell Toast ── */
+#shell-toast {
+  position: fixed; top: 20px; left: 50%;
+  transform: translateX(-50%) translateY(-120px);
+  background: var(--text); color: #000;
+  padding: 10px 24px; border-radius: 30px;
+  font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+  z-index: 9999; white-space: nowrap; pointer-events: none;
+}
+#shell-toast.show { transform: translateX(-50%) translateY(0); }
+#shell-toast.err  { background: var(--red); color: #fff; }
+
+/* ═══════════════════════════════════════════
+   SHARED — Used by all modules
+═══════════════════════════════════════════ */
+.mod-header {
+  padding: 28px 20px 8px;
+  display: flex; justify-content: space-between; align-items: flex-end;
+}
+.sys-label {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 4px;
+  color: var(--muted); text-transform: uppercase; display: block;
+}
+.mod-title { font-size: 26px; font-weight: 800; letter-spacing: -1px; line-height: 1.05; }
+.mod-title em { font-style: normal; color: var(--amber); }
+
+.stats-bar {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 10px; padding: 12px 20px;
+}
+.stat {
+  background: var(--glass); backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border); border-radius: 16px;
+  padding: 12px 10px; text-align: center;
+}
+.stat-val { font-family: var(--mono); font-size: 21px; font-weight: 700; display: block; line-height: 1; }
+.stat-sub { font-family: var(--mono); font-size: 8px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-top: 4px; display: block; }
+
+.pill-row { padding: 8px 20px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.pill-row::-webkit-scrollbar { display: none; }
+
+.pill {
+  padding: 7px 16px; border-radius: 30px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--text); font-family: var(--sans); font-size: 11px; font-weight: 600;
+  white-space: nowrap; cursor: pointer; transition: 0.2s; backdrop-filter: blur(5px);
+}
+.pill.active  { background: var(--text); color: #000; border-color: var(--text); }
+.pill.p-amber { background: var(--amber); color: #000; border-color: var(--amber); }
+
+.list-area { padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 10px; }
+.section-head {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  letter-spacing: 2px; text-transform: uppercase;
+  padding: 12px 4px 4px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.card {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 18px;
+  padding: 15px; display: flex; align-items: center; gap: 14px; transition: 0.2s;
+}
+.card:active { transform: scale(0.985); }
+.card.overdue { border-color: rgba(255,71,87,0.45); background: rgba(255,71,87,0.06); }
+.card.today   { border-color: rgba(245,166,35,0.4);  background: rgba(245,166,35,0.05); }
+.card.done    { opacity: 0.32; filter: grayscale(0.7); }
+
+.checkbox {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--glass-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; cursor: pointer; transition: 0.15s;
+}
+.checkbox.checked { background: var(--green); border-color: var(--green); color: #000; }
+
+.card-body { flex: 1; min-width: 0; }
+.card-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 3px; }
+.card-meta  { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.btn-del    { background: transparent; border: none; color: var(--muted); padding: 5px; cursor: pointer; font-size: 14px; opacity: 0.4; transition: 0.2s; }
+.btn-del:hover { opacity: 1; color: var(--red); }
+.clear-btn  { background: transparent; border: 1px solid rgba(255,71,87,0.4); color: var(--red); font-size: 8px; font-family: var(--mono); padding: 2px 8px; border-radius: 4px; cursor: pointer; letter-spacing: 1px; }
+.empty-state { text-align: center; padding: 50px 20px; color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: 2px; }
+
+.slide-panel {
+  position: fixed; bottom: 0; left: 50%;
+  transform: translateX(-50%) translateY(100%);
+  width: 100%; max-width: 480px;
+  background: rgba(10,10,12,0.96); backdrop-filter: blur(30px);
+  border-radius: 28px 28px 0 0;
+  padding: 28px 20px max(48px,env(safe-area-inset-bottom));
+  transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+  z-index: 800; border-top: 1px solid var(--glass-border);
+}
+.slide-panel.open { transform: translateX(-50%) translateY(0); }
+
+input, select {
+  width: 100%; background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 12px; padding: 12px; color: var(--text); margin-bottom: 10px;
+  font-family: var(--sans); font-size: 14px; outline: none; -webkit-appearance: none;
+}
+input:focus, select:focus { border-color: var(--amber); }
+select option { background: #141416; }
+
+.fab {
+  position: fixed; bottom: 82px; right: 20px;
+  width: 54px; height: 54px; border-radius: 50%;
+  background: var(--text); border: none; color: #000;
+  font-size: 26px; box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+  z-index: 850; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: 0.3s;
+}
+.fab.open { transform: rotate(45deg); background: var(--red-dim); color: var(--red); border: 1px solid var(--red); box-shadow: none; }
+
+
+/* ═══════════════════════════════════════════
+   ACADEMIC v2 — Mental Clarity styles
+═══════════════════════════════════════════ */
+.week-header {
+  padding: 18px 4px 6px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.week-label {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  color: var(--text); letter-spacing: 2px; text-transform: uppercase;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.week-progress-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.week-bar-track {
+  flex: 1; height: 4px; background: rgba(255,255,255,0.08);
+  border-radius: 4px; overflow: hidden;
+}
+.week-bar-fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--green), var(--amber));
+  transition: width 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+.week-bar-label {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  white-space: nowrap;
+}
+.card.soon { border-color: rgba(245,166,35,0.45); background: rgba(245,166,35,0.06); }
+
+.completed-toggle {
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+  letter-spacing: 1px; padding: 14px 4px 6px;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  user-select: none; -webkit-user-select: none;
+}
+.completed-toggle:active { opacity: 0.6; }
+.completed-caret { font-size: 8px; transition: transform 0.2s; }
+.completed-caret.open { transform: rotate(90deg); }
+.completed-list { display: flex; flex-direction: column; gap: 10px; }
+.purge-row { padding: 8px 4px 4px; display: flex; justify-content: flex-end; }
+
+/* ═══════════════════════════════════════════
+   INCOME MODULE — v3.4 FLUID styles
+═══════════════════════════════════════════ */
+.inc-wrap { padding: 0 18px 24px; }
+
+/* Progress card */
+.progress-card {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 20px;
+  padding: 18px; margin-bottom: 16px;
+}
+.pc-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+.pc-net { font-family: var(--mono); font-size: 32px; font-weight: 700; color: var(--green); line-height: 1; }
+.pc-net sup { font-size: 14px; vertical-align: super; }
+.pc-target { text-align: right; }
+.pc-target-val { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--muted); }
+.v-bar { height: 6px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+.v-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--green), var(--amber)); transition: width 0.5s cubic-bezier(0.16,1,0.3,1); }
+.v-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--muted); }
+
+/* Week tabs */
+.week-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.week-tab {
+  flex: 1; padding: 11px; border-radius: 12px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--muted); cursor: pointer; font-family: var(--mono);
+  font-size: 10px; text-align: center; font-weight: 600; transition: 0.2s;
+}
+.week-tab.active { background: var(--green); color: #000; border-color: var(--green); font-weight: 700; }
+
+/* Day rows */
+.day-row {
+  display: grid; grid-template-columns: 72px 1fr auto;
+  align-items: center; gap: 10px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 14px; padding: 12px 14px; margin-bottom: 8px;
+  backdrop-filter: blur(8px);
+}
+.day-name { font-size: 11px; font-weight: 700; color: var(--muted); font-family: var(--mono); letter-spacing: 1px; }
+.day-name.on { color: var(--text); }
+
+.tag-row { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.tag { font-size: 8px; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+.tag-base   { background: rgba(46,213,115,0.12); color: var(--green); }
+.tag-pickup { background: rgba(245,166,35,0.12);  color: var(--amber); }
+.tag-wknd   { background: rgba(30,144,255,0.12);  color: var(--blue); }
+.tag-ot     { background: rgba(255,71,87,0.12);   color: var(--red); border: 1px solid rgba(255,71,87,0.25); }
+
+.chip-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.chip {
+  padding: 5px 9px; border-radius: 6px;
+  border: 1px solid var(--glass-border); background: rgba(255,255,255,0.04);
+  color: var(--muted); font-family: var(--mono); font-size: 10px;
+  cursor: pointer; transition: 0.15s; font-weight: 600;
+}
+.chip.active { border-color: var(--green); color: var(--green); background: rgba(46,213,115,0.08); }
+.chip.active-w { border-color: var(--amber); color: var(--amber); background: rgba(245,166,35,0.08); }
+.chip-remove { color: var(--red); border: none; background: transparent; cursor: pointer; font-size: 16px; padding: 2px 8px; line-height: 1; }
+
+.day-earn { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--muted); text-align: right; white-space: nowrap; }
+.day-earn.on { color: var(--green); }
+
+/* Clear row */
+.inc-clear-row { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+
+/* ═══════════════════════════════════════════
+   DASHBOARD MODULE
+═══════════════════════════════════════════ */
+.dash-wrap { padding: 0 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.dash-status {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 20px;
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 4px;
+}
+.dash-status-line {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; text-align: center; line-height: 1.6;
+}
+.dash-card {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 18px;
+  padding: 16px 18px; cursor: pointer; transition: background 0.2s;
+}
+.dash-card:active { background: var(--glass-hi); }
+.dash-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.dash-card-label { font-family: var(--mono); font-size: 8px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+.dash-card-badge { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; }
+.badge-ok     { background: rgba(46,213,115,0.15); color: var(--green); }
+.badge-warn   { background: rgba(255,71,87,0.15);  color: var(--red); }
+.badge-locked { background: rgba(245,166,35,0.15); color: var(--amber); }
+.badge-clear  { background: rgba(46,213,115,0.15); color: var(--green); }
+.dash-val { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.dash-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.dash-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
+.dash-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(0.16,1,0.3,1); }
+.dash-next-due { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--glass-border); }
+.dash-next-due strong { color: var(--text); }
+.dash-tap-hint { font-family: var(--mono); font-size: 8px; color: var(--muted); text-align: right; margin-top: 6px; letter-spacing: 1px; }
+
+/* Export button */
+.export-btn {
+  position: fixed; bottom: 82px; left: 20px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px); border-radius: 30px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
+  color: var(--muted); padding: 8px 14px; cursor: pointer;
+  z-index: 800; transition: 0.2s; white-space: nowrap;
+}
+.export-btn:active { background: var(--glass-hi); color: var(--text); }
+
+/* ═══════════════════════════════════════════
+   TRADING — locked
+═══════════════════════════════════════════ */
+.locked-wrap {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 70dvh; gap: 16px; padding: 40px 30px; text-align: center;
+}
+.locked-icon { font-size: 48px; opacity: 0.25; }
+.locked-title { font-size: 22px; font-weight: 800; color: var(--muted); }
+.locked-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; line-height: 2; }
+</style>
+</head>
+<body>
+
+<div id="shell-toast"></div>
+<div id="main-content"></div>
+<button class="export-btn" onclick="Shell.exportState()" title="Export with data">⬇ EXPORT</button>
+
+<nav class="shell-nav" id="shell-nav">
+  <div class="nav-tab active" data-mod="dashboard">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+    <span class="nav-label">Home</span>
+  </div>
+  <div class="nav-tab" data-mod="income">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="1" x2="12" y2="23"/>
+      <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+    </svg>
+    <span class="nav-label">Income</span>
+  </div>
+  <div class="nav-tab" data-mod="academic">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/>
+      <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+    </svg>
+    <span class="nav-label">Academic</span>
+  </div>
+  <div class="nav-tab" data-mod="trading">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+      <polyline points="16 7 22 7 22 13"/>
+    </svg>
+    <span class="nav-label">Trading</span>
+  </div>
+</nav>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════
+   SHELL
+═══════════════════════════════════════════ */
+const Shell = {
+  _active: null,
+  _clockInterval: null,
+  modules: {},
+
+  init() {
+    document.getElementById('shell-nav').addEventListener('click', e => {
+      const tab = e.target.closest('[data-mod]');
+      if (tab) this.switchTo(tab.dataset.mod);
+    });
+    this.switchTo('dashboard');
+  },
+
+  switchTo(name) {
+    const mod = this.modules[name];
+    if (!mod) return;
+    if (this._active?.teardown) this._active.teardown();
+    if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.mod === name));
+    document.querySelectorAll('.slide-panel, .fab').forEach(el => el.remove());
+    this._active = mod;
+    mod.init();
+    if (mod.updateClock) {
+      mod.updateClock();
+      this._clockInterval = setInterval(() => mod.updateClock(), 1000);
+    }
+  },
+
+  exportState() {
+    // Collect all localStorage keys used by TruOS
+    const state = {
+      'truos-academic':    localStorage.getItem('truos-academic')    || '[]',
+      'truos-ac-filter':   localStorage.getItem('truos-ac-filter')   || 'all',
+      'truos_schedule_v34': localStorage.getItem('truos_schedule_v34') || 'null',
+    };
+
+    // Read current HTML
+    const html = document.documentElement.outerHTML;
+
+    // Inject a bootstrap script just before </body> that restores state on load
+    const bootstrap = `
+<script id="truos-state-bootstrap">
+(function(){
+  const state = ${JSON.stringify(state)};
+  Object.entries(state).forEach(([k,v]) => { if(v && v !== 'null') localStorage.setItem(k,v); });
+  document.getElementById('truos-state-bootstrap').remove();
+})();
+<\/script>`;
+
+    const parts = html.split('<\/body>');
+    const exported = parts[0] + bootstrap + '\n<\/body>' + (parts[1] || '');
+
+    // Download
+    const blob = new Blob([exported], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'TruOS-Unified.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    Shell.toast('STATE EXPORTED — OPEN ON ANY DEVICE');
+  },
+
+  toast(msg, isErr = false) {
+    const t = document.getElementById('shell-toast');
+    t.textContent = msg;
+    t.className = 'show' + (isErr ? ' err' : '');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.className = '', 2400);
+  }
+};
+
+/* ── Shared utils ── */
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function mount(html) { document.getElementById('main-content').innerHTML = html; }
+function nowClock() {
+  return {
+    time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
+    date: new Date().toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' }).toUpperCase()
+  };
+}
+
+/* ═══════════════════════════════════════════
+   MODULE 01 — INCOME OPTIMIZER
+   Faithful port of TruOS v3.4 FLUID
+   All calculation logic preserved exactly.
+═══════════════════════════════════════════ */
+const IncomeModule = {
+
+  /* ── Exact CONFIG from v3.4 ── */
+  CFG: {
+    baseRate:    17.31,
+    diffs:       { afternoon: 2.50, midnight: 2.75, weekend: 2.00 },
+    tax:         0.192,
+    otThreshold: 40,
+    target:      2000
+  },
+
+  DAYS: ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+
+  state: {
+    weeks:      null,  // hydrated in init()
+    activeWeek: 0
+  },
+
+  /* ── Core math — exact port from v3.4 ── */
+  calculateShiftGross(isWeekend, cumHrsBefore, duration) {
+    const { baseRate, diffs, otThreshold } = this.CFG;
+    const wknd = isWeekend ? diffs.weekend : 0;
+    const blockAHrs = Math.min(duration, 4.5);
+    const blockBHrs = Math.max(0, duration - blockAHrs);
+
+    const blocks = [
+      { hrs: blockAHrs, rate: baseRate + diffs.afternoon + wknd },
+      { hrs: blockBHrs, rate: baseRate + diffs.midnight  + wknd }
+    ];
+
+    let shiftTotal = 0;
+    let runningCumHrs = cumHrsBefore;
+
+    blocks.forEach(block => {
+      if (block.hrs <= 0) return;
+      const regInBlock = Math.min(block.hrs, Math.max(0, otThreshold - runningCumHrs));
+      const otInBlock  = block.hrs - regInBlock;
+      shiftTotal      += (regInBlock * block.rate) + (otInBlock * block.rate * 1.5);
+      runningCumHrs   += block.hrs;
+    });
+    return shiftTotal;
+  },
+
+  toNet(gross) { return gross * (1 - this.CFG.tax); },
+
+  emptyWeeks() {
+    return [0,1].map(() =>
+      this.DAYS.reduce((acc, d) => ({ ...acc, [d]: { type: 'off', hrs: 12 } }), {})
+    );
+  },
+
+  /* ── Replaces React's useMemo weekCalcs ── */
+  calcWeek(week) {
+    let totalGross = 0, cumHrs = 0;
+    const days = {};
+    this.DAYS.forEach(day => {
+      const s = week[day];
+      if (s.type === 'off') { days[day] = { ...s, gross: 0, net: 0, otHrs: 0 }; return; }
+      const gross   = this.calculateShiftGross(s.type === 'wknd', cumHrs, s.hrs);
+      const otTotal = Math.max(0, (cumHrs + s.hrs) - this.CFG.otThreshold);
+      const shiftOT = Math.min(s.hrs, otTotal);
+      days[day]     = { ...s, gross, net: this.toNet(gross), otHrs: shiftOT };
+      totalGross   += gross;
+      cumHrs       += s.hrs;
+    });
+    return { days, totalGross, totalNet: this.toNet(totalGross), totalHrs: cumHrs };
+  },
+
+  getCombined(weekCalcs) {
+    const gross = weekCalcs[0].totalGross + weekCalcs[1].totalGross;
+    return { gross, net: this.toNet(gross), hrs: weekCalcs[0].totalHrs + weekCalcs[1].totalHrs };
+  },
+
+  fmt(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+
+  /* ── Storage ── */
+  init() {
+    // Hydrate fresh each mount — no stale IIFE state
+    try {
+      const raw = localStorage.getItem('truos_schedule_v34');
+      this.state.weeks = raw ? JSON.parse(raw) : this.emptyWeeks();
+      // Validate shape
+      if (!Array.isArray(this.state.weeks) || this.state.weeks.length !== 2) {
+        this.state.weeks = this.emptyWeeks();
+      }
+    } catch {
+      this.state.weeks = this.emptyWeeks();
+      localStorage.removeItem('truos_schedule_v34');
+    }
+    this.state.activeWeek = 0;
+    this.render();
+    this.bindEvents();
+  },
+
+  save() {
+    try { localStorage.setItem('truos_schedule_v34', JSON.stringify(this.state.weeks)); } catch(e) {}
+  },
+
+  updateDay(wi, day, type, hrs) {
+    this.state.weeks[wi] = { ...this.state.weeks[wi], [day]: { type, hrs } };
+    this.save();
+    this.render();
+    this.bindEvents();
+  },
+
+  updateClock() {
+    const c = nowClock();
+    const te = document.getElementById('inc-time');
+    const de = document.getElementById('inc-date');
+    if (te) te.textContent = c.time;
+    if (de) de.textContent = c.date;
+  },
+
+  /* ── Render ── */
+  render() {
+    const weekCalcs  = this.state.weeks.map(w => this.calcWeek(w));
+    const combined   = this.getCombined(weekCalcs);
+    const remaining  = Math.max(0, this.CFG.target - combined.net);
+    const pct        = Math.min(100, (combined.net / this.CFG.target) * 100);
+    const aw         = this.state.activeWeek;
+    const wc         = weekCalcs[aw];
+
+    /* Week tabs */
+    const tabsHTML = [0,1].map(wi => `
+      <div class="week-tab${aw === wi ? ' active' : ''}" data-action="week-tab" data-wi="${wi}">
+        WEEK ${wi+1} · ${weekCalcs[wi].totalHrs}H
+      </div>`).join('');
+
+    /* Day rows */
+    const daysHTML = this.DAYS.map(day => {
+      const s   = wc.days[day];
+      const isOn = s.type !== 'off';
+      const tagType = s.type === 'wknd' ? 'wknd' : s.type === 'base' ? 'base' : 'pickup';
+
+      const typeChips = ['base','pickup','wknd'].map(t => {
+        const active = s.type === t;
+        const cls = active ? (t === 'wknd' ? 'chip active-w' : 'chip active') : 'chip';
+        return `<button class="${cls}" data-action="set-type" data-day="${day}" data-type="${t}" data-hrs="${s.hrs}">${t[0].toUpperCase()}</button>`;
+      }).join('');
+
+      const hrsChips = isOn ? [8,12].map(h =>
+        `<button class="chip${s.hrs===h?' active':''}" data-action="set-hrs" data-day="${day}" data-type="${s.type}" data-hrs="${h}">${h}H</button>`
+      ).join('') : '';
+
+      const removeBtn = isOn
+        ? `<button class="chip-remove" data-action="remove-day" data-day="${day}">✕</button>`
+        : '';
+
+      return `
+        <div class="day-row">
+          <div>
+            <div class="day-name${isOn ? ' on' : ''}">${day.substring(0,3).toUpperCase()}</div>
+            ${isOn ? `<div class="tag-row">
+              <span class="tag tag-${tagType}">${s.hrs}H ${s.type}</span>
+              ${s.otHrs > 0 ? `<span class="tag tag-ot">${s.otHrs}H OT</span>` : ''}
+            </div>` : ''}
+          </div>
+          <div>
+            <div class="chip-row">${typeChips}${removeBtn}</div>
+            ${isOn ? `<div class="chip-row">${hrsChips}</div>` : ''}
+          </div>
+          <div class="day-earn${isOn ? ' on' : ''}">
+            ${isOn ? `$${Math.round(s.net)}` : '—'}
+          </div>
+        </div>`;
+    }).join('');
+
+    const gapColor = remaining > 0 ? 'var(--red)' : 'var(--green)';
+    const gapText  = remaining > 0 ? `GAP: -$${this.fmt(remaining)}` : '✓ GOAL REACHED';
+
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 01</span>
+          <h1 class="mod-title">Income<br><em>Optimizer</em></h1>
+        </div>
+        <div style="text-align:right">
+          <div class="sys-label" id="inc-date"></div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:700;" id="inc-time"></div>
+        </div>
+      </header>
+
+      <div class="inc-wrap">
+
+        <!-- Progress card -->
+        <div class="progress-card">
+          <div class="pc-top">
+            <div>
+              <div class="sys-label" style="margin-bottom:5px">Biweekly Net</div>
+              <div class="pc-net"><sup>$</sup>${this.fmt(combined.net)}</div>
+            </div>
+            <div class="pc-target">
+              <div class="pc-target-val">$${this.CFG.target}</div>
+              <div class="sys-label" style="margin-top:2px">target</div>
+            </div>
+          </div>
+          <div class="v-bar"><div class="v-fill" style="width:${pct}%"></div></div>
+          <div class="v-meta">
+            <span>${pct.toFixed(1)}% complete · ${combined.hrs}H scheduled</span>
+            <span style="color:${gapColor}">${gapText}</span>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-bar" style="padding:0 0 16px">
+          <div class="stat">
+            <span class="stat-val" style="color:var(--green)">$${Math.round(combined.net)}</span>
+            <span class="stat-sub">Net Pay</span>
+          </div>
+          <div class="stat">
+            <span class="stat-val" style="color:var(--amber)">$${Math.round(combined.gross)}</span>
+            <span class="stat-sub">Gross</span>
+          </div>
+          <div class="stat">
+            <span class="stat-val" style="color:var(--muted)">${combined.hrs}H</span>
+            <span class="stat-sub">Hours</span>
+          </div>
+        </div>
+
+        <!-- Week tabs + clear -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="sys-label">Schedule Builder</div>
+          <button class="clear-btn" data-action="clear-all">CLEAR</button>
+        </div>
+        <div class="week-tabs">${tabsHTML}</div>
+
+        <!-- Day rows -->
+        <div id="days-grid">${daysHTML}</div>
+
+      </div>
+    `);
+
+    this.updateClock();
+  },
+
+  bindEvents() {
+    const wrap = document.getElementById('main-content');
+    if (!wrap || wrap._incBound) return;
+    wrap._incBound = true;
+
+    wrap.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const { action, wi, day, type, hrs } = btn.dataset;
+      const aw = this.state.activeWeek;
+
+      if (action === 'week-tab') {
+        this.state.activeWeek = +wi;
+        this.render(); this.bindEvents(); return;
+      }
+      if (action === 'clear-all') {
+        if (confirm('Clear both weeks?')) {
+          this.state.weeks = this.emptyWeeks();
+          this.save(); this.render(); this.bindEvents();
+        }
+        return;
+      }
+      if (action === 'set-type') {
+        this.updateDay(aw, day, type, +hrs); return;
+      }
+      if (action === 'set-hrs') {
+        this.updateDay(aw, day, type, +hrs); return;
+      }
+      if (action === 'remove-day') {
+        this.updateDay(aw, day, 'off', 12); return;
+      }
+    });
+  },
+
+  teardown() {
+    const wrap = document.getElementById('main-content');
+    if (wrap) wrap._incBound = false;
+  }
+};
+
+/* ═══════════════════════════════════════════
+   MODULE 02 — ACADEMIC TRACKER (Canvas Optimized)
+═══════════════════════════════════════════ */
+const AcademicModule = {
+  CFG: { class1: "MAT 151 (Math)", class2: "PSY 101 (Psych)" },
+  state: { assignments: [], filter: 'all' },
+
+  init() {
+    try {
+      const raw = localStorage.getItem('truos-academic');
+      this.state.assignments = raw ? JSON.parse(raw) : [];
+    } catch { 
+      this.state.assignments = []; 
+    }
+    this.state.filter = localStorage.getItem('truos-ac-filter') || 'all';
+    this.render();
+    this.bindEvents();
+  },
+
+  importICS(text) {
+    const events = [];
+    const blocks = text.split('BEGIN:VEVENT');
+    blocks.shift();
+
+    blocks.forEach(block => {
+      const titleMatch = block.match(/SUMMARY:(.*(?:\r?\n\s.*)*)/);
+      let fullTitle = titleMatch ? titleMatch[1].replace(/\r?\n\s/g, '').trim() : "Untitled";
+      let displayTitle = fullTitle.split('[')[0].trim();
+
+      const dateMatch = block.match(/DTSTART[:;].*?(\d{8})/);
+      let dueStr = "";
+      if (dateMatch) {
+        const d = dateMatch[1];
+        dueStr = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}T23:59:00`;
+      }
+
+      const cls = fullTitle.includes("MAT 151") ? "c1" : "c2";
+
+      if (dueStr && !fullTitle.includes("OFFICE HOURS")) {
+        events.push({
+          id: 'ac-' + Math.random().toString(36).substr(2, 9),
+          title: displayTitle,
+          due: dueStr,
+          cls: cls,
+          done: false
+        });
+      }
+    });
+
+    const existing = JSON.parse(localStorage.getItem('truos-academic') || '[]');
+    const combined = [...existing, ...events].reduce((acc, current) => {
+      const isDup = acc.find(item => item.title === current.title && item.due === current.due && item.cls === current.cls);
+      if (!isDup) acc.push(current);
+      return acc;
+    }, []);
+
+    this.state.assignments = combined;
+    this.save();
+    Shell.toast(`SYNCED: ${events.length} CANVAS TASKS`);
+  },
+
+  save() {
+    localStorage.setItem('truos-academic', JSON.stringify(this.state.assignments));
+    localStorage.setItem('truos-ac-filter', this.state.filter);
+    this.render();
+    this.bindEvents();
+  },
+
+  urgency(due, done) {
+    if (done) return 'done';
+    const hours = (new Date(due) - new Date()) / 36e5;
+    if (hours < 0) return 'overdue';
+    if (hours < 24) return 'today';
+    if (hours < 72) return 'soon';
+    return 'upcoming';
+  },
+
+  // Returns week number (1-based) relative to the earliest due date in dataset
+  _weekNum(dueDate, minDate) {
+    return Math.floor((new Date(dueDate) - minDate) / (7 * 24 * 36e5)) + 1;
+  },
+
+  // Build a single card HTML string
+  _card(a) {
+    const u  = this.urgency(a.due, a.done);
+    const dt = new Date(a.due).toLocaleDateString([], {month:'short', day:'numeric'});
+    return `
+      <div class="card ${a.done ? 'done' : u}">
+        <div class="checkbox ${a.done ? 'checked' : ''}" onclick="AcademicModule.toggle('${a.id}')">${a.done ? '✓' : ''}</div>
+        <div class="card-body">
+          <div class="card-title">${esc(a.title)}</div>
+          <div class="card-meta">${a.cls === 'c1' ? 'MAT 151' : 'PSY 101'} · Due ${dt}</div>
+        </div>
+        <button class="btn-del" onclick="AcademicModule.remove('${a.id}')">✕</button>
+      </div>`;
+  },
+
+  render() {
+    const all = this.state.assignments;
+
+    // Determine anchor date (earliest due in full dataset, ignoring filter)
+    const dates = all.map(a => new Date(a.due)).filter(d => !isNaN(d));
+    const minDate = dates.length ? new Date(Math.min(...dates)) : new Date();
+
+    // Apply class filter for display
+    const visible = all.filter(a => {
+      if (this.state.filter === 'c1') return a.cls === 'c1';
+      if (this.state.filter === 'c2') return a.cls === 'c2';
+      return true;
+    });
+
+    // Split pending vs done
+    const pending = visible.filter(a => !a.done).sort((a,b) => new Date(a.due) - new Date(b.due));
+    const done    = visible.filter(a => a.done).sort((a,b) => new Date(a.due) - new Date(b.due));
+
+    // Group pending by week number
+    const weekMap = new Map();
+    pending.forEach(a => {
+      const wk = this._weekNum(a.due, minDate);
+      if (!weekMap.has(wk)) weekMap.set(wk, []);
+      weekMap.get(wk).push(a);
+    });
+
+    // Build week progress denominator from ALL (not just filtered) per week
+    const weekTotals = new Map();
+    all.forEach(a => {
+      const wk = this._weekNum(a.due, minDate);
+      if (!weekTotals.has(wk)) weekTotals.set(wk, { total: 0, done: 0 });
+      weekTotals.get(wk).total++;
+      if (a.done) weekTotals.get(wk).done++;
+    });
+
+    // Header
+    let html = `
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 02</span>
+          <h1 class="mod-title">Academic<br><em>Tracker</em></h1>
+        </div>
+      </header>
+      <div class="pill-row">
+        <button class="pill ${this.state.filter==='all'?'active':''}" onclick="AcademicModule.setFilter('all')">ALL</button>
+        <button class="pill ${this.state.filter==='c1'?'active':''}" onclick="AcademicModule.setFilter('c1')">MATH</button>
+        <button class="pill ${this.state.filter==='c2'?'active':''}" onclick="AcademicModule.setFilter('c2')">PSYCH</button>
+        <button class="pill p-amber" onclick="document.getElementById('ics-input').click()">+ IMPORT ICS</button>
+        <input type="file" id="ics-input" hidden onchange="AcademicModule.handleFile(this)">
+      </div>
+      <div class="list-area">`;
+
+    if (pending.length === 0 && done.length === 0) {
+      html += `<div class="empty-state">NO ASSIGNMENTS FOUND</div>`;
+    }
+
+    // Render week groups
+    const sortedWeeks = [...weekMap.keys()].sort((a,b) => a - b);
+    sortedWeeks.forEach(wk => {
+      const items  = weekMap.get(wk);
+      const totals = weekTotals.get(wk) || { total: items.length, done: 0 };
+      const pct    = totals.total > 0 ? Math.round((totals.done / totals.total) * 100) : 0;
+      const barW   = Math.min(100, pct);
+      const barColor = pct === 100 ? 'background:var(--green)' : '';
+
+      html += `
+        <div class="week-header">
+          <div class="week-label">
+            <span>Week ${wk}</span>
+            <span style="color:var(--muted);font-size:9px">${totals.done}/${totals.total} done</span>
+          </div>
+          <div class="week-progress-row">
+            <div class="week-bar-track">
+              <div class="week-bar-fill" style="width:${barW}%;${barColor}"></div>
+            </div>
+            <span class="week-bar-label">${pct}%</span>
+          </div>
+        </div>`;
+
+      items.forEach(a => { html += this._card(a); });
+    });
+
+    // Completed section
+    if (done.length > 0) {
+      const isOpen = this.state.completedOpen || false;
+      html += `
+        <div class="completed-toggle" onclick="AcademicModule.toggleCompleted()">
+          <span class="completed-caret ${isOpen ? 'open' : ''}">▶</span>
+          COMPLETED (${done.length})
+          <button class="clear-btn" style="margin-left:auto" onclick="event.stopPropagation();AcademicModule.purgeCompleted()">PURGE</button>
+        </div>`;
+      if (isOpen) {
+        html += `<div class="completed-list">`;
+        done.forEach(a => { html += this._card(a); });
+        html += `</div>`;
+      }
+    }
+
+    html += `</div>`;
+    mount(html);
+  },
+
+  toggleCompleted() {
+    this.state.completedOpen = !this.state.completedOpen;
+    this.render();
+  },
+
+  purgeCompleted() {
+    if (!confirm('Remove all completed assignments?')) return;
+    this.state.assignments = this.state.assignments.filter(a => !a.done);
+    this.state.completedOpen = false;
+    this.save();
+    Shell.toast('COMPLETED TASKS PURGED');
+  },
+
+  setFilter(f) { this.state.filter = f; localStorage.setItem('truos-ac-filter', f); this.render(); },
+  toggle(id) {
+    const a = this.state.assignments.find(x => x.id === id);
+    if (a) a.done = !a.done;
+    this.save();
+  },
+  remove(id) {
+    this.state.assignments = this.state.assignments.filter(x => x.id !== id);
+    this.save();
+  },
+  handleFile(input) {
+    const reader = new FileReader();
+    reader.onload = (e) => this.importICS(e.target.result);
+    reader.readAsText(input.files[0]);
+  },
+  bindEvents() {},
+  updateClock() {},
+  teardown() { document.querySelectorAll('#ac-panel, #ac-fab').forEach(el => el.remove()); }
+};
+
+
+/* ═══════════════════════════════════════════
+   MODULE 03 — TRADING TERMINAL
+   Locked until Academic backlog is clear.
+   Reads truos-academic directly from storage
+   so state is always fresh on tab switch.
+═══════════════════════════════════════════ */
+const TradingModule = {
+  init() {
+    try {
+      const acData = JSON.parse(localStorage.getItem('truos-academic') || '[]');
+      const now    = new Date();
+      const overdue = acData.filter(a => !a.done && new Date(a.due) < now);
+      overdue.length > 0 ? this.renderLocked(overdue.length) : this.renderActive();
+    } catch {
+      this.renderActive(); // fail open
+    }
+  },
+
+  renderLocked(count) {
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 03</span>
+          <h1 class="mod-title">Trading<br><em>Terminal</em></h1>
+        </div>
+      </header>
+      <div class="locked-wrap">
+        <div class="locked-icon">⚠️</div>
+        <div class="locked-title">TERMINAL RESTRICTED</div>
+        <div class="locked-sub">
+          ACADEMIC DEBT DETECTED<br>
+          <span style="color:var(--red);font-size:13px;font-weight:700">${count} OVERDUE TASK${count !== 1 ? 'S' : ''}</span><br><br>
+          PROTOCOL REQUIRES ZERO BACKLOG<br>
+          FOR TRADING ACCESS
+        </div>
+        <button class="pill p-amber" style="margin-top:24px;padding:12px 28px"
+                onclick="Shell.switchTo('academic')">
+          RESOLVE ACADEMIC LOGS →
+        </button>
+      </div>`);
+  },
+
+  renderActive() {
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 03</span>
+          <h1 class="mod-title">Trading<br><em>Terminal</em></h1>
+        </div>
+        <div style="text-align:right">
+          <div class="sys-label">STATUS</div>
+          <div style="font-family:var(--mono);font-size:13px;color:var(--green);margin-top:2px">● CLEAR</div>
+        </div>
+      </header>
+      <div class="stats-bar">
+        <div class="stat"><span class="stat-val" style="color:var(--green)">$0.00</span><span class="stat-sub">P/L Day</span></div>
+        <div class="stat"><span class="stat-val" style="color:var(--muted)">0.0%</span><span class="stat-sub">Daily Chg</span></div>
+        <div class="stat"><span class="stat-val" style="color:var(--muted)">0</span><span class="stat-sub">Positions</span></div>
+      </div>
+      <div class="empty-state">TERMINAL ACTIVE<br>MARKET MODULE AWAITING BUILD</div>`);
+  },
+
+  updateClock() {},
+  teardown() {}
+};
+
+/* ═══════════════════════════════════════════
+   MODULE 00 — GLOBAL DASHBOARD
+   Reads all three storage keys fresh on every
+   mount. No shared state — localStorage IS
+   the bus.
+═══════════════════════════════════════════ */
+const DashboardModule = {
+
+  // Reuse Income math directly — single source of truth
+  _incomeStats() {
+    const CFG = IncomeModule.CFG;
+    try {
+      const raw = localStorage.getItem('truos_schedule_v34');
+      const weeks = raw ? JSON.parse(raw) : IncomeModule.emptyWeeks();
+      if (!Array.isArray(weeks) || weeks.length !== 2) return { net: 0, hrs: 0, pct: 0, gap: CFG.target };
+      const calcs  = weeks.map(w => IncomeModule.calcWeek(w));
+      const gross  = calcs[0].totalGross + calcs[1].totalGross;
+      const net    = IncomeModule.toNet(gross);
+      const hrs    = calcs[0].totalHrs   + calcs[1].totalHrs;
+      const pct    = Math.min(100, (net / CFG.target) * 100);
+      const gap    = Math.max(0, CFG.target - net);
+      return { net, hrs, pct, gap, target: CFG.target };
+    } catch { return { net: 0, hrs: 0, pct: 0, gap: CFG.target, target: CFG.target }; }
+  },
+
+  _academicStats() {
+    try {
+      const raw  = localStorage.getItem('truos-academic');
+      const data = raw ? JSON.parse(raw) : [];
+      const now  = new Date();
+      const in72 = new Date(now.getTime() + 72 * 36e5);
+      const overdue  = data.filter(a => !a.done && new Date(a.due) < now);
+      const urgent   = data.filter(a => !a.done && new Date(a.due) >= now && new Date(a.due) <= in72);
+      const done     = data.filter(a => a.done).length;
+      const total    = data.length;
+      const upcoming = data
+        .filter(a => !a.done && new Date(a.due) >= now)
+        .sort((a, b) => new Date(a.due) - new Date(b.due));
+      const next = upcoming[0] || null;
+      return { overdue: overdue.length, urgent: urgent.length, done, total, next };
+    } catch { return { overdue: 0, urgent: 0, done: 0, total: 0, next: null }; }
+  },
+
+  _tradingLocked(overdueCount) {
+    return overdueCount > 0;
+  },
+
+  // Status line — reads the full system state and picks a message
+  _statusLine(income, academic, tradingLocked) {
+    const incomeGood   = income.pct  >= 100;
+    const academicGood = academic.overdue === 0;
+
+    if (incomeGood && academicGood)
+      return { text: 'ALL SYSTEMS NOMINAL', color: 'var(--green)' };
+    if (!academicGood && income.gap > 500)
+      return { text: `DEBT ON TWO FRONTS · ${academic.overdue} OVERDUE · $${Math.round(income.gap)} GAP`, color: 'var(--red)' };
+    if (!academicGood)
+      return { text: `ACADEMIC DEBT DETECTED · ${academic.overdue} OVERDUE TASK${academic.overdue !== 1 ? 'S' : ''}`, color: 'var(--red)' };
+    if (academic.total - academic.done > 5)
+      return { text: 'WARNING: HIGH ACADEMIC LOAD', color: 'var(--amber)' };
+    if (income.gap > 0)
+      return { text: `$${Math.round(income.gap)} TO TARGET · SCHEDULE MORE SHIFTS`, color: 'var(--amber)' };
+    return { text: 'INCOME SECURED · CLEAR BACKLOG TO UNLOCK TRADING', color: 'var(--blue)' };
+  },
+
+  init() {
+    const income   = this._incomeStats();
+    const academic = this._academicStats();
+    const locked   = this._tradingLocked(academic.overdue);
+    const status   = this._statusLine(income, academic, locked);
+
+    const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+    // Income bar color
+    const barColor = income.pct >= 100 ? 'var(--green)'
+      : income.pct >= 60 ? 'var(--amber)' : 'var(--red)';
+
+    // Academic badge — shows overdue first, then 72h warning, then clear
+    const acBadge = academic.overdue > 0
+      ? `<span class="dash-card-badge badge-warn">${academic.overdue} OVERDUE</span>`
+      : academic.urgent > 0
+        ? `<span class="dash-card-badge badge-warn" style="background:rgba(245,166,35,0.15);border-color:rgba(245,166,35,0.4);color:var(--amber)">${academic.urgent} DUE SOON</span>`
+        : `<span class="dash-card-badge badge-ok">CLEAR</span>`;
+
+    // Next due string
+    const nextDueHTML = academic.next
+      ? `<div class="dash-next-due">NEXT DUE → <strong>${esc(academic.next.title)}</strong> · ${new Date(academic.next.due).toLocaleDateString([],{month:'short',day:'numeric'})}</div>`
+      : academic.total === 0
+        ? `<div class="dash-next-due">NO TASKS LOGGED</div>`
+        : `<div class="dash-next-due" style="color:var(--green)">NO UPCOMING TASKS</div>`;
+
+    // Trading badge
+    const tradeBadge = locked
+      ? `<span class="dash-card-badge badge-locked">LOCKED</span>`
+      : `<span class="dash-card-badge badge-clear">UNLOCKED</span>`;
+    const tradeColor = locked ? 'var(--amber)' : 'var(--green)';
+    const tradeText  = locked
+      ? `Clear ${academic.overdue} overdue task${academic.overdue !== 1 ? 's' : ''} to unlock`
+      : 'Academic backlog clear — terminal active';
+
+    const c = nowClock();
+
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Dashboard</span>
+          <h1 class="mod-title">System<br><em>Overview</em></h1>
+        </div>
+        <div style="text-align:right">
+          <div class="sys-label" id="dash-date">${c.date}</div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:700;" id="dash-time">${c.time}</div>
+        </div>
+      </header>
+
+      <div class="dash-wrap">
+
+        <!-- Status line -->
+        <div class="dash-status">
+          <div class="sys-label" style="text-align:center;margin-bottom:6px">System Status</div>
+          <div class="dash-status-line" style="color:${status.color}">${status.text}</div>
+        </div>
+
+        <!-- Income card -->
+        <div class="dash-card" onclick="Shell.switchTo('income')">
+          <div class="dash-card-top">
+            <span class="dash-card-label">Income · Biweekly</span>
+            ${income.pct >= 100
+              ? `<span class="dash-card-badge badge-ok">GOAL MET</span>`
+              : `<span class="dash-card-badge badge-warn">$${fmt(income.gap)} GAP</span>`}
+          </div>
+          <div class="dash-val" style="color:${barColor}">$${fmt(income.net)}</div>
+          <div class="dash-sub">of $${fmt(income.target)} target · ${income.hrs}H scheduled</div>
+          <div class="dash-bar">
+            <div class="dash-bar-fill" style="width:${income.pct}%;background:${barColor}"></div>
+          </div>
+          <div class="dash-sub">${income.pct.toFixed(1)}% complete</div>
+          <div class="dash-tap-hint">TAP TO EDIT SCHEDULE →</div>
+        </div>
+
+        <!-- Academic card -->
+        <div class="dash-card" onclick="Shell.switchTo('academic')">
+          <div class="dash-card-top">
+            <span class="dash-card-label">Academic · Tasks</span>
+            ${acBadge}
+          </div>
+          <div style="display:flex;gap:16px;align-items:flex-end">
+            <div>
+              <div class="dash-val" style="color:${academic.overdue > 0 ? 'var(--red)' : 'var(--green)'}">
+                ${academic.overdue}
+              </div>
+              <div class="dash-sub">overdue</div>
+            </div>
+            <div style="padding-bottom:2px">
+              <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--muted)">${academic.done}/${academic.total}</div>
+              <div class="dash-sub">completed</div>
+            </div>
+          </div>
+          ${nextDueHTML}
+          <div class="dash-tap-hint">TAP TO VIEW TASKS →</div>
+        </div>
+
+        <!-- Trading card -->
+        <div class="dash-card" onclick="Shell.switchTo('trading')">
+          <div class="dash-card-top">
+            <span class="dash-card-label">Trading · Terminal</span>
+            ${tradeBadge}
+          </div>
+          <div class="dash-val" style="color:${tradeColor};font-size:20px;margin-bottom:6px">
+            ${locked ? '⚠ RESTRICTED' : '● OPERATIONAL'}
+          </div>
+          <div class="dash-sub">${tradeText}</div>
+          <div class="dash-tap-hint">TAP TO OPEN TERMINAL →</div>
+        </div>
+
+      </div>
+    `);
+  },
+
+  updateClock() {
+    const c = nowClock();
+    const te = document.getElementById('dash-time');
+    const de = document.getElementById('dash-date');
+    if (te) te.textContent = c.time;
+    if (de) de.textContent = c.date;
+  },
+
+  teardown() {}
+};
+
+/* ═══════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════ */
+Shell.modules = { dashboard: DashboardModule, income: IncomeModule, academic: AcademicModule, trading: TradingModule };
+Shell.init();
+</script>
+</body>
+</html>
