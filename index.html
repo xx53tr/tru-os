@@ -9,6 +9,9 @@
 <title>TruOS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
 /* ═══════════════════════════════════════════
    SHELL — Tokens & layout
@@ -341,8 +344,16 @@ select option { background: #141416; }
 .dash-next-due strong { color: var(--text); }
 .dash-tap-hint { font-family: var(--mono); font-size: 8px; color: var(--muted); text-align: right; margin-top: 6px; letter-spacing: 1px; }
 
-/* Export button */
-.export-btn {
+/* Sync badge */
+.sync-badge {
+  position: fixed; top: 12px; right: 14px;
+  font-family: var(--mono); font-size: 8px; letter-spacing: 1.5px;
+  color: var(--muted); z-index: 1000; pointer-events: none;
+  transition: color 0.4s;
+}
+.sync-badge.online  { color: var(--green); }
+.sync-badge.offline { color: var(--muted); }
+.sync-badge.syncing { color: var(--amber); }
   position: fixed; bottom: 82px; left: 20px;
   background: var(--glass); border: 1px solid var(--glass-border);
   backdrop-filter: blur(12px); border-radius: 30px;
@@ -362,11 +373,123 @@ select option { background: #141416; }
 .locked-icon { font-size: 48px; opacity: 0.25; }
 .locked-title { font-size: 22px; font-weight: 800; color: var(--muted); }
 .locked-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; line-height: 2; }
+
+/* ═══════════════════════════════════════════
+   TRADING TERMINAL — active
+═══════════════════════════════════════════ */
+.trade-wrap { padding: 0 18px 100px; }
+
+.ticker-card {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 18px;
+  padding: 14px 16px; display: flex; align-items: center; gap: 10px;
+  transition: 0.2s; cursor: pointer;
+}
+.ticker-card:active { transform: scale(0.985); }
+.ticker-card.selected { border-color: rgba(245,166,35,0.5); background: rgba(245,166,35,0.06); }
+.ticker-symbol { font-family: var(--mono); font-size: 14px; font-weight: 700; min-width: 56px; }
+.ticker-name { font-size: 11px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticker-price-col { text-align: right; }
+.ticker-price { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+.ticker-chg { font-family: var(--mono); font-size: 10px; font-weight: 700; }
+.chg-up   { color: var(--green); }
+.chg-down { color: var(--red); }
+.chg-flat { color: var(--muted); }
+.ticker-del { background: transparent; border: none; color: var(--muted); padding: 4px 8px; cursor: pointer; font-size: 14px; opacity: 0.4; transition: 0.2s; }
+.ticker-del:hover { opacity: 1; color: var(--red); }
+
+.ticker-loading { font-family: var(--mono); font-size: 10px; color: var(--muted); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+
+.trade-panel {
+  background: var(--glass); backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border); border-radius: 20px;
+  padding: 18px; margin-top: 14px; overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.trade-panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.trade-symbol-badge {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  background: rgba(245,166,35,0.15); color: var(--amber);
+  padding: 4px 12px; border-radius: 20px;
+}
+.trade-price-display {
+  font-family: var(--mono); font-size: 22px; font-weight: 700;
+}
+.trade-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.trade-tab {
+  flex: 1; padding: 10px; border-radius: 10px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--muted); cursor: pointer; font-family: var(--mono);
+  font-size: 10px; text-align: center; font-weight: 700; letter-spacing: 1px;
+  transition: 0.2s;
+}
+.trade-tab.buy-active  { background: rgba(46,213,115,0.15);  color: var(--green);  border-color: rgba(46,213,115,0.4); }
+.trade-tab.sell-active { background: rgba(255,71,87,0.15);   color: var(--red);    border-color: rgba(255,71,87,0.4); }
+.trade-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.trade-label { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 1px; min-width: 50px; }
+.trade-val { font-family: var(--mono); font-size: 12px; font-weight: 700; }
+.shares-input { flex: 1; text-align: right; }
+.trade-execute {
+  width: 100%; padding: 14px; border-radius: 14px; border: none;
+  font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+  cursor: pointer; transition: 0.2s; margin-top: 4px;
+}
+.execute-buy  { background: var(--green);  color: #000; }
+.execute-sell { background: var(--red);    color: #fff; }
+.execute-buy:active  { opacity: 0.8; }
+.execute-sell:active { opacity: 0.8; }
+
+.position-row {
+  background: var(--glass); backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border); border-radius: 14px;
+  padding: 12px 14px;
+}
+.pos-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.pos-symbol { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+.pos-pnl { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+.pos-meta { display: flex; justify-content: space-between; }
+.pos-meta-item { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+
+.cash-bar {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 14px; padding: 12px 14px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.cash-label { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 2px; }
+.cash-val { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--green); }
+
+.ticker-add-row {
+  display: flex; gap: 8px; margin-bottom: 14px;
+}
+.ticker-add-input {
+  flex: 1; text-transform: uppercase; margin-bottom: 0 !important;
+}
+.ticker-add-btn {
+  padding: 12px 18px; border-radius: 12px; border: none;
+  background: var(--amber); color: #000; font-family: var(--mono);
+  font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.ticker-add-btn:active { opacity: 0.8; }
+
+.reset-portfolio-btn {
+  background: transparent; border: 1px solid rgba(255,71,87,0.3);
+  color: var(--red); font-family: var(--mono); font-size: 8px;
+  padding: 4px 10px; border-radius: 6px; cursor: pointer; letter-spacing: 1px;
+}
+.trade-err { font-family: var(--mono); font-size: 10px; color: var(--red); margin-top: 8px; text-align: center; min-height: 16px; }
+.market-status { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; }
+.market-open   { color: var(--green); }
+.market-closed { color: var(--muted); }
 </style>
 </head>
 <body>
 
 <div id="shell-toast"></div>
+<div id="sync-badge" class="sync-badge">○ OFFLINE</div>
 <div id="main-content"></div>
 <button class="export-btn" onclick="Shell.exportState()" title="Export with data">⬇ EXPORT</button>
 
@@ -407,6 +530,131 @@ select option { background: #141416; }
 'use strict';
 
 /* ═══════════════════════════════════════════
+   FIREBASE CONFIG
+   ─────────────────────────────────────────
+   1. Go to console.firebase.google.com
+   2. Create project → Realtime Database → Start in test mode
+   3. Project Settings → Your apps → Add web app
+   4. Copy the firebaseConfig object values below
+═══════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyCNAzcnmXuuPkUQljum0p8GEAPe-YBh2bU",
+  authDomain:        "realtime-database-ebc45.firebaseapp.com",
+  databaseURL:       "https://realtime-database-ebc45-default-rtdb.firebaseio.com",
+  projectId:         "realtime-database-ebc45",
+  storageBucket:     "realtime-database-ebc45.firebasestorage.app",
+  messagingSenderId: "712853625298",
+  appId:             "1:712853625298:web:ea3001eaf8b9f2c067100b"
+};
+
+/* ═══════════════════════════════════════════
+   TruDB — Firebase + localStorage sync layer
+   ─────────────────────────────────────────
+   • All reads hit localStorage first (instant, works offline)
+   • All writes go to localStorage AND Firebase simultaneously
+   • Real-time listeners push remote changes to every open device
+   • If Firebase is not configured, runs fully on localStorage only
+═══════════════════════════════════════════ */
+const TruDB = {
+  _db:        null,
+  _listeners: {},
+  _ready:     false,
+
+  init() {
+    const configured = FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.startsWith('PASTE');
+    if (!configured) {
+      console.info('TruDB: Firebase not configured — running on localStorage only');
+      return;
+    }
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      this._db   = firebase.database();
+      this._ready = true;
+      // Silent anonymous sign-in — locked to your specific UID in rules
+      firebase.auth().signInAnonymously().then(cred => {
+        const uid = cred.user.uid;
+        // Persist UID so export carries it to other devices
+        localStorage.setItem('truos-owner-uid', uid);
+        // Show UID copy button until rules are locked
+        const badge = document.getElementById('sync-badge');
+        if (badge && !localStorage.getItem('truos-uid-locked')) {
+          badge.style.pointerEvents = 'auto';
+          badge.style.cursor = 'pointer';
+          badge.title = 'Click to copy your UID for Firebase rules';
+          badge.addEventListener('click', () => {
+            navigator.clipboard.writeText(uid).then(() => {
+              Shell.toast('UID COPIED — PASTE INTO FIREBASE RULES');
+            });
+          });
+          badge.textContent = '⚠ COPY UID';
+          badge.className = 'sync-badge syncing';
+        }
+      }).catch(e => console.warn('TruDB: auth failed', e));
+      // Track connection state for sync badge
+      this._db.ref('.info/connected').on('value', snap => {
+        const badge = document.getElementById('sync-badge');
+        if (!badge) return;
+        if (snap.val()) {
+          badge.textContent = '● SYNCED';
+          badge.className   = 'sync-badge online';
+        } else {
+          badge.textContent = '○ OFFLINE';
+          badge.className   = 'sync-badge offline';
+        }
+      });
+    } catch(e) {
+      console.warn('TruDB: Firebase init failed, running offline:', e);
+      this._ready = false;
+    }
+  },
+
+  // Normalize localStorage key → Firebase path
+  _path(key) { return '/truos/' + key.replace(/[.#$\[\]]/g, '_'); },
+
+  // Write to localStorage immediately + push to Firebase
+  set(key, value) {
+    const json = JSON.stringify(value);
+    try { localStorage.setItem(key, json); } catch {}
+    if (this._ready && this._db) {
+      const badge = document.getElementById('sync-badge');
+      if (badge) { badge.textContent = '↑ SYNCING'; badge.className = 'sync-badge syncing'; }
+      this._db.ref(this._path(key)).set(json).catch(e => console.warn('TruDB write error:', e));
+    }
+  },
+
+  // Read from localStorage cache (synchronous, instant)
+  get(key) { return localStorage.getItem(key); },
+
+  // Subscribe to real-time changes from any device
+  // cb(parsedValue) fires whenever another device writes
+  on(key, cb) {
+    if (!this._ready || !this._db) return;
+    if (this._listeners[key]) this._listeners[key].off(); // clean up old
+    const ref = this._db.ref(this._path(key));
+    this._listeners[key] = ref;
+    ref.on('value', snap => {
+      const remote = snap.val();
+      if (remote === null || remote === undefined) return;
+      const local = localStorage.getItem(key);
+      // Only update if remote differs from local (avoids echo of our own writes)
+      if (remote !== local) {
+        try { localStorage.setItem(key, remote); } catch {}
+        try { cb(JSON.parse(remote)); } catch { cb(remote); }
+      }
+    });
+  },
+
+  off(key) {
+    if (this._listeners[key]) {
+      this._listeners[key].off();
+      delete this._listeners[key];
+    }
+  },
+
+  offAll() { Object.keys(this._listeners).forEach(k => this.off(k)); }
+};
+
+/* ═══════════════════════════════════════════
    SHELL
 ═══════════════════════════════════════════ */
 const Shell = {
@@ -415,6 +663,7 @@ const Shell = {
   modules: {},
 
   init() {
+    TruDB.init();
     document.getElementById('shell-nav').addEventListener('click', e => {
       const tab = e.target.closest('[data-mod]');
       if (tab) this.switchTo(tab.dataset.mod);
@@ -427,6 +676,7 @@ const Shell = {
     if (!mod) return;
     if (this._active?.teardown) this._active.teardown();
     if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
+    TruDB.offAll(); // detach all real-time listeners before mounting new module
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.mod === name));
     document.querySelectorAll('.slide-panel, .fab').forEach(el => el.remove());
     this._active = mod;
@@ -440,9 +690,11 @@ const Shell = {
   exportState() {
     // Collect all localStorage keys used by TruOS
     const state = {
-      'truos-academic':    localStorage.getItem('truos-academic')    || '[]',
-      'truos-ac-filter':   localStorage.getItem('truos-ac-filter')   || 'all',
-      'truos_schedule_v34': localStorage.getItem('truos_schedule_v34') || 'null',
+      'truos-academic':         localStorage.getItem('truos-academic')         || '[]',
+      'truos-ac-filter':        localStorage.getItem('truos-ac-filter')        || 'all',
+      'truos_schedule_v34':     localStorage.getItem('truos_schedule_v34')     || 'null',
+      'truos-trading-portfolio': localStorage.getItem('truos-trading-portfolio') || 'null',
+      'truos-trading-watchlist': localStorage.getItem('truos-trading-watchlist') || 'null',
     };
 
     // Read current HTML
@@ -575,7 +827,7 @@ const IncomeModule = {
   init() {
     // Hydrate fresh each mount — no stale IIFE state
     try {
-      const raw = localStorage.getItem('truos_schedule_v34');
+      const raw = TruDB.get('truos_schedule_v34');
       this.state.weeks = raw ? JSON.parse(raw) : this.emptyWeeks();
       // Validate shape
       if (!Array.isArray(this.state.weeks) || this.state.weeks.length !== 2) {
@@ -588,10 +840,19 @@ const IncomeModule = {
     this.state.activeWeek = 0;
     this.render();
     this.bindEvents();
+
+    // Real-time sync — another device updated the schedule
+    TruDB.on('truos_schedule_v34', data => {
+      if (!Array.isArray(data) || data.length !== 2) return;
+      this.state.weeks = data;
+      this.render();
+      this.bindEvents();
+      Shell.toast('SCHEDULE SYNCED FROM ANOTHER DEVICE');
+    });
   },
 
   save() {
-    try { localStorage.setItem('truos_schedule_v34', JSON.stringify(this.state.weeks)); } catch(e) {}
+    try { TruDB.set('truos_schedule_v34', this.state.weeks); } catch(e) {}
   },
 
   updateDay(wi, day, type, hrs) {
@@ -780,18 +1041,26 @@ const AcademicModule = {
 
   init() {
     try {
-      const raw = localStorage.getItem('truos-academic');
+      const raw = TruDB.get('truos-academic');
       this.state.assignments = raw ? JSON.parse(raw) : [];
     } catch { 
       this.state.assignments = []; 
     }
-    this.state.filter = localStorage.getItem('truos-ac-filter') || 'all';
+    this.state.filter = TruDB.get('truos-ac-filter') || 'all';
     this.render();
     this.bindEvents();
+
+    // Real-time sync — another device toggled a task or imported ICS
+    TruDB.on('truos-academic', data => {
+      if (!Array.isArray(data)) return;
+      this.state.assignments = data;
+      this.render();
+      Shell.toast('TASKS SYNCED FROM ANOTHER DEVICE');
+    });
   },
 
   importICS(text) {
-    const events = [];
+    const incoming = [];
     const blocks = text.split('BEGIN:VEVENT');
     blocks.shift();
 
@@ -810,31 +1079,51 @@ const AcademicModule = {
       const cls = fullTitle.includes("MAT 151") ? "c1" : "c2";
 
       if (dueStr && !fullTitle.includes("OFFICE HOURS")) {
-        events.push({
-          id: 'ac-' + Math.random().toString(36).substr(2, 9),
-          title: displayTitle,
-          due: dueStr,
-          cls: cls,
-          done: false
-        });
+        incoming.push({ title: displayTitle, due: dueStr, cls });
       }
     });
 
-    const existing = JSON.parse(localStorage.getItem('truos-academic') || '[]');
-    const combined = [...existing, ...events].reduce((acc, current) => {
-      const isDup = acc.find(item => item.title === current.title && item.due === current.due && item.cls === current.cls);
-      if (!isDup) acc.push(current);
-      return acc;
-    }, []);
+    // ── Merge logic ──────────────────────────────────────────
+    // Rule A: title + cls match, different due → UPDATE due date, PRESERVE done
+    // Rule B: title + cls + due all match → skip (true duplicate)
+    // Rule C: no title+cls match → ADD new entry
+    const existing = JSON.parse(TruDB.get('truos-academic') || '[]');
+    let updated = 0, added = 0;
 
-    this.state.assignments = combined;
+    incoming.forEach(ev => {
+      const matchIdx = existing.findIndex(x => x.title === ev.title && x.cls === ev.cls);
+      if (matchIdx !== -1) {
+        if (existing[matchIdx].due !== ev.due) {
+          // Reschedule — update due, keep done state
+          existing[matchIdx].due = ev.due;
+          updated++;
+        }
+        // else: exact duplicate — skip
+      } else {
+        // New assignment
+        existing.push({
+          id:    'ac-' + Math.random().toString(36).substr(2, 9),
+          title: ev.title,
+          due:   ev.due,
+          cls:   ev.cls,
+          done:  false
+        });
+        added++;
+      }
+    });
+
+    this.state.assignments = existing;
     this.save();
-    Shell.toast(`SYNCED: ${events.length} CANVAS TASKS`);
+    const msg = [
+      added   > 0 ? `${added} NEW`         : '',
+      updated > 0 ? `${updated} RESCHEDULED` : ''
+    ].filter(Boolean).join(' · ') || 'NO CHANGES';
+    Shell.toast(`ICS SYNCED: ${msg}`);
   },
 
   save() {
-    localStorage.setItem('truos-academic', JSON.stringify(this.state.assignments));
-    localStorage.setItem('truos-ac-filter', this.state.filter);
+    TruDB.set('truos-academic', this.state.assignments);
+    TruDB.set('truos-ac-filter', this.state.filter);
     this.render();
     this.bindEvents();
   },
@@ -924,31 +1213,37 @@ const AcademicModule = {
       html += `<div class="empty-state">NO ASSIGNMENTS FOUND</div>`;
     }
 
-    // Render week groups
+    // Render week groups — falls back to flat list if grouping fails
     const sortedWeeks = [...weekMap.keys()].sort((a,b) => a - b);
-    sortedWeeks.forEach(wk => {
-      const items  = weekMap.get(wk);
-      const totals = weekTotals.get(wk) || { total: items.length, done: 0 };
-      const pct    = totals.total > 0 ? Math.round((totals.done / totals.total) * 100) : 0;
-      const barW   = Math.min(100, pct);
-      const barColor = pct === 100 ? 'background:var(--green)' : '';
+    try {
+      sortedWeeks.forEach(wk => {
+        const items  = weekMap.get(wk);
+        const totals = weekTotals.get(wk) || { total: items.length, done: 0 };
+        const pct    = totals.total > 0 ? Math.round((totals.done / totals.total) * 100) : 0;
+        const barW   = Math.min(100, pct);
+        const barColor = pct === 100 ? 'background:var(--green)' : '';
 
-      html += `
-        <div class="week-header">
-          <div class="week-label">
-            <span>Week ${wk}</span>
-            <span style="color:var(--muted);font-size:9px">${totals.done}/${totals.total} done</span>
-          </div>
-          <div class="week-progress-row">
-            <div class="week-bar-track">
-              <div class="week-bar-fill" style="width:${barW}%;${barColor}"></div>
+        html += `
+          <div class="week-header">
+            <div class="week-label">
+              <span>Week ${wk}</span>
+              <span style="color:var(--muted);font-size:9px">${totals.done}/${totals.total} done</span>
             </div>
-            <span class="week-bar-label">${pct}%</span>
-          </div>
-        </div>`;
+            <div class="week-progress-row">
+              <div class="week-bar-track">
+                <div class="week-bar-fill" style="width:${barW}%;${barColor}"></div>
+              </div>
+              <span class="week-bar-label">${pct}%</span>
+            </div>
+          </div>`;
 
-      items.forEach(a => { html += this._card(a); });
-    });
+        items.forEach(a => { html += this._card(a); });
+      });
+    } catch(e) {
+      // Fallback: flat list, no week headers
+      console.warn('Academic: week grouping failed, rendering flat list', e);
+      pending.forEach(a => { html += this._card(a); });
+    }
 
     // Completed section
     if (done.length > 0) {
@@ -983,7 +1278,7 @@ const AcademicModule = {
     Shell.toast('COMPLETED TASKS PURGED');
   },
 
-  setFilter(f) { this.state.filter = f; localStorage.setItem('truos-ac-filter', f); this.render(); },
+  setFilter(f) { this.state.filter = f; TruDB.set('truos-ac-filter', f); this.render(); },
   toggle(id) {
     const a = this.state.assignments.find(x => x.id === id);
     if (a) a.done = !a.done;
@@ -1011,17 +1306,192 @@ const AcademicModule = {
    so state is always fresh on tab switch.
 ═══════════════════════════════════════════ */
 const TradingModule = {
-  init() {
+
+  PORTFOLIO_KEY: 'truos-trading-portfolio',
+  WATCHLIST_KEY: 'truos-trading-watchlist',
+
+  DEFAULT_WATCHLIST: ['SPY', 'QQQ', 'AAPL', 'NVDA', 'TSLA'],
+  DEFAULT_PORTFOLIO: { cash: 10000, positions: {}, trades: [] },
+
+  _state: {
+    watchlist: [],
+    portfolio: null,
+    quotes: {},         // symbol → { price, chg, chgPct, name, loading }
+    selectedTicker: null,
+    tradeMode: 'buy',   // 'buy' | 'sell'
+    tradeShares: '',
+    tradeErr: '',
+    refreshTimer: null,
+  },
+
+  /* ── Storage ── */
+  _loadPortfolio() {
     try {
-      const acData = JSON.parse(localStorage.getItem('truos-academic') || '[]');
-      const now    = new Date();
-      const overdue = acData.filter(a => !a.done && new Date(a.due) < now);
-      overdue.length > 0 ? this.renderLocked(overdue.length) : this.renderActive();
+      const raw = TruDB.get(this.PORTFOLIO_KEY);
+      return raw ? JSON.parse(raw) : { ...this.DEFAULT_PORTFOLIO, positions: {}, trades: [] };
+    } catch { return { ...this.DEFAULT_PORTFOLIO, positions: {}, trades: [] }; }
+  },
+  _savePortfolio() {
+    try { TruDB.set(this.PORTFOLIO_KEY, this._state.portfolio); } catch {}
+  },
+  _loadWatchlist() {
+    try {
+      const raw = TruDB.get(this.WATCHLIST_KEY);
+      return raw ? JSON.parse(raw) : [...this.DEFAULT_WATCHLIST];
+    } catch { return [...this.DEFAULT_WATCHLIST]; }
+  },
+  _saveWatchlist() {
+    try { TruDB.set(this.WATCHLIST_KEY, this._state.watchlist); } catch {}
+  },
+
+  /* ── Market data ── */
+  async _fetchQuotes(symbols) {
+    if (!symbols.length) return;
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}&fields=regularMarketPrice,regularMarketChangePercent,regularMarketChange,shortName`;
+    const fetchedAt = Date.now();
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const results = data?.quoteResponse?.result || [];
+      results.forEach(q => {
+        this._state.quotes[q.symbol] = {
+          price:     q.regularMarketPrice,
+          chg:       q.regularMarketChange,
+          chgPct:    q.regularMarketChangePercent,
+          name:      q.shortName || q.symbol,
+          loading:   false,
+          error:     false,
+          fetchedAt
+        };
+      });
+      // Mark any unreturned symbols as error (keep last price if we had one)
+      symbols.forEach(s => {
+        if (!this._state.quotes[s] || this._state.quotes[s].loading) {
+          this._state.quotes[s] = {
+            ...(this._state.quotes[s] || {}),
+            price: this._state.quotes[s]?.price ?? null,
+            loading: false, error: true, fetchedAt: this._state.quotes[s]?.fetchedAt ?? null
+          };
+        }
+      });
+      this._renderActive();
     } catch {
-      this.renderActive(); // fail open
+      symbols.forEach(s => {
+        // Preserve last known price on failure — just flag error + keep fetchedAt
+        this._state.quotes[s] = {
+          ...(this._state.quotes[s] || {}),
+          loading: false, error: true
+        };
+      });
+      this._renderActive();
     }
   },
 
+  _ageLabel(fetchedAt) {
+    if (!fetchedAt) return '';
+    const sec = Math.floor((Date.now() - fetchedAt) / 1000);
+    if (sec < 60)  return `${sec}s ago`;
+    if (sec < 3600) return `${Math.floor(sec/60)}m ago`;
+    return `${Math.floor(sec/3600)}h ago`;
+  },
+
+  _isMarketOpen() {
+    const now = new Date();
+    const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day = et.getDay();
+    const h = et.getHours(), m = et.getMinutes();
+    const mins = h * 60 + m;
+    return day > 0 && day < 6 && mins >= 570 && mins < 960; // 9:30–16:00 ET
+  },
+
+  /* ── Calculations ── */
+  _portfolioStats() {
+    const p = this._state.portfolio;
+    const quotes = this._state.quotes;
+    let marketValue = 0;
+    let dayPL = 0;
+    let totalPL = 0;
+
+    Object.entries(p.positions).forEach(([sym, pos]) => {
+      const q = quotes[sym];
+      if (!q || !q.price) return;
+      const mv = q.price * pos.shares;
+      marketValue += mv;
+      const costBasis = pos.avgCost * pos.shares;
+      totalPL += (mv - costBasis);
+      dayPL += (q.chg * pos.shares);
+    });
+
+    const portfolioValue = p.cash + marketValue;
+    return { portfolioValue, marketValue, dayPL, totalPL };
+  },
+
+  _fmtPrice(n) {
+    if (n == null) return '—';
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+  _fmtPct(n) {
+    if (n == null) return '—';
+    return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+  },
+  _chgClass(n) {
+    return n > 0 ? 'chg-up' : n < 0 ? 'chg-down' : 'chg-flat';
+  },
+
+  /* ── Lock check ── */
+  init() {
+    try {
+      const acData = JSON.parse(TruDB.get('truos-academic') || '[]');
+      const now    = new Date();
+      const overdue = acData.filter(a => !a.done && new Date(a.due) < now);
+      if (overdue.length > 0) { this.renderLocked(overdue.length); return; }
+    } catch {}
+    this._initActive();
+  },
+
+  _initActive() {
+    this._state.watchlist  = this._loadWatchlist();
+    this._state.portfolio  = this._loadPortfolio();
+    this._state.quotes     = {};
+
+    // Seed loading state
+    this._state.watchlist.forEach(s => {
+      this._state.quotes[s] = { price: null, chg: 0, chgPct: 0, name: s, loading: true, error: false };
+    });
+    // Also seed any positions not in watchlist
+    Object.keys(this._state.portfolio.positions).forEach(s => {
+      if (!this._state.quotes[s]) {
+        this._state.quotes[s] = { price: null, chg: 0, chgPct: 0, name: s, loading: true, error: false };
+      }
+    });
+
+    this._renderActive();
+    this._fetchAll();
+
+    // Auto-refresh every 15s during market hours
+    if (this._state.refreshTimer) clearInterval(this._state.refreshTimer);
+    this._state.refreshTimer = setInterval(() => { if (this._isMarketOpen()) this._fetchAll(); }, 15000);
+
+    // Real-time portfolio sync — another device made a trade
+    TruDB.on(this.PORTFOLIO_KEY, data => {
+      if (!data || typeof data !== 'object') return;
+      this._state.portfolio = data;
+      this._renderActive();
+    });
+    TruDB.on(this.WATCHLIST_KEY, data => {
+      if (!Array.isArray(data)) return;
+      this._state.watchlist = data;
+      this._fetchAll();
+    });
+  },
+
+  _fetchAll() {
+    const all = [...new Set([...this._state.watchlist, ...Object.keys(this._state.portfolio.positions)])];
+    if (all.length) this._fetchQuotes(all);
+  },
+
+  /* ── Render locked ── */
   renderLocked(count) {
     mount(`
       <header class="mod-header">
@@ -1046,7 +1516,136 @@ const TradingModule = {
       </div>`);
   },
 
-  renderActive() {
+  /* ── Render active terminal ── */
+  _renderActive() {
+    const p = this._state.portfolio;
+    const q = this._state.quotes;
+    const s = this._state;
+    const stats = this._portfolioStats();
+
+    const marketOpen = this._isMarketOpen();
+    const mktStatus = marketOpen
+      ? `<span class="market-status market-open">● MARKET OPEN</span>`
+      : `<span class="market-status market-closed">○ MARKET CLOSED</span>`;
+
+    // Stats bar
+    const dayPlColor = stats.dayPL >= 0 ? 'var(--green)' : 'var(--red)';
+    const totalPlColor = stats.totalPL >= 0 ? 'var(--green)' : 'var(--red)';
+    const totalPlPct = stats.portfolioValue > 0
+      ? ((stats.totalPL / 10000) * 100).toFixed(1)
+      : '0.0';
+
+    // Watchlist
+    const watchlistHTML = s.watchlist.map(sym => {
+      const qt = q[sym] || { loading: true };
+      const selected = s.selectedTicker === sym;
+      const priceHTML = qt.loading
+        ? `<span class="ticker-loading">LOADING</span>`
+        : qt.error && qt.price == null
+          ? `<div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-align:right">—<br><span style="font-size:8px">NO DATA</span></div>`
+          : qt.error && qt.price != null
+            ? `<div class="ticker-price" style="opacity:0.6">${this._fmtPrice(qt.price)}</div>
+               <div class="ticker-chg chg-flat" style="font-size:8px">STALE · ${this._ageLabel(qt.fetchedAt)}</div>`
+            : `<div class="ticker-price">${this._fmtPrice(qt.price)}</div>
+               <div class="ticker-chg ${this._chgClass(qt.chgPct)}">${this._fmtPct(qt.chgPct)}</div>`;
+
+      return `
+        <div class="ticker-card${selected ? ' selected' : ''}" data-action="select-ticker" data-sym="${esc(sym)}">
+          <div>
+            <div class="ticker-symbol">${esc(sym)}</div>
+          </div>
+          <div class="ticker-name">${esc(qt.name || sym)}</div>
+          <div class="ticker-price-col">${priceHTML}</div>
+          <button class="ticker-del" data-action="remove-ticker" data-sym="${esc(sym)}" title="Remove">✕</button>
+        </div>`;
+    }).join('');
+
+    // Trade panel (shows when ticker selected)
+    let tradePanelHTML = '';
+    if (s.selectedTicker) {
+      const tq = q[s.selectedTicker] || {};
+      const pos = p.positions[s.selectedTicker] || null;
+      const price = tq.price;
+      const sharesNum = parseFloat(s.tradeShares) || 0;
+      const orderCost = price ? price * sharesNum : 0;
+
+      tradePanelHTML = `
+        <div class="trade-panel">
+          <div class="trade-panel-header">
+            <div>
+              <span class="trade-symbol-badge">${esc(s.selectedTicker)}</span>
+            </div>
+            <div class="trade-price-display">
+              ${price ? '$' + this._fmtPrice(price) : '<span class="chg-flat" style="font-size:14px">—</span>'}
+            </div>
+          </div>
+          <div class="trade-tabs">
+            <div class="trade-tab${s.tradeMode === 'buy' ? ' buy-active' : ''}" data-action="trade-mode" data-mode="buy">BUY</div>
+            <div class="trade-tab${s.tradeMode === 'sell' ? ' sell-active' : ''}" data-action="trade-mode" data-mode="sell">SELL</div>
+          </div>
+          <div class="trade-row">
+            <span class="trade-label">SHARES</span>
+            <input class="shares-input" id="trade-shares-input" type="number" min="0.01" step="0.01"
+              placeholder="0" value="${esc(s.tradeShares)}"
+              style="background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;padding:10px;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text);outline:none;width:100%;text-align:right;margin-bottom:0">
+          </div>
+          <div class="trade-row" style="margin-top:8px">
+            <span class="trade-label">COST</span>
+            <span class="trade-val">${price && sharesNum ? '$' + this._fmtPrice(orderCost) : '—'}</span>
+          </div>
+          <div class="trade-row">
+            <span class="trade-label">CASH</span>
+            <span class="trade-val" style="color:var(--green)">$${this._fmtPrice(p.cash)}</span>
+          </div>
+          ${pos ? `
+          <div class="trade-row">
+            <span class="trade-label">HELD</span>
+            <span class="trade-val">${pos.shares} @ $${this._fmtPrice(pos.avgCost)}</span>
+          </div>` : ''}
+          <button class="trade-execute ${s.tradeMode === 'buy' ? 'execute-buy' : 'execute-sell'}"
+                  data-action="execute-trade">
+            ${s.tradeMode === 'buy' ? '▲ BUY' : '▼ SELL'} ${s.selectedTicker}
+          </button>
+          <div class="trade-err" id="trade-err">${esc(s.tradeErr)}</div>
+        </div>`;
+    }
+
+    // Positions
+    const posEntries = Object.entries(p.positions).filter(([,pos]) => pos.shares > 0);
+    let positionsHTML = '';
+    if (posEntries.length) {
+      positionsHTML = posEntries.map(([sym, pos]) => {
+        const qt = q[sym];
+        const price = qt?.price;
+        const mv = price ? price * pos.shares : null;
+        const pl = mv != null ? mv - (pos.avgCost * pos.shares) : null;
+        const plPct = pl != null ? (pl / (pos.avgCost * pos.shares)) * 100 : null;
+        const plColor = pl == null ? 'var(--muted)' : pl >= 0 ? 'var(--green)' : 'var(--red)';
+        return `
+          <div class="position-row">
+            <div class="pos-top">
+              <div>
+                <div class="pos-symbol">${esc(sym)}</div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px">${pos.shares} shares</div>
+              </div>
+              <div>
+                <div class="pos-pnl" style="color:${plColor}">
+                  ${pl != null ? (pl >= 0 ? '+' : '') + '$' + this._fmtPrice(pl) : '—'}
+                </div>
+                <div style="font-family:var(--mono);font-size:9px;color:${plColor};text-align:right">
+                  ${plPct != null ? this._fmtPct(plPct) : ''}
+                </div>
+              </div>
+            </div>
+            <div class="pos-meta">
+              <span class="pos-meta-item">AVG COST $${this._fmtPrice(pos.avgCost)}</span>
+              <span class="pos-meta-item">${price ? 'MKT $' + this._fmtPrice(price) : qt?.loading ? 'LOADING…' : 'N/A'}</span>
+              <span class="pos-meta-item">VALUE ${mv != null ? '$' + this._fmtPrice(mv) : '—'}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
     mount(`
       <header class="mod-header">
         <div>
@@ -1054,35 +1653,252 @@ const TradingModule = {
           <h1 class="mod-title">Trading<br><em>Terminal</em></h1>
         </div>
         <div style="text-align:right">
-          <div class="sys-label">STATUS</div>
-          <div style="font-family:var(--mono);font-size:13px;color:var(--green);margin-top:2px">● CLEAR</div>
+          ${mktStatus}<br>
+          <button class="sys-label" onclick="TradingModule._fetchAll()" style="background:none;border:none;color:var(--amber);cursor:pointer;padding:4px 0;letter-spacing:2px;margin-top:4px">↻ REFRESH</button>
         </div>
       </header>
+
       <div class="stats-bar">
-        <div class="stat"><span class="stat-val" style="color:var(--green)">$0.00</span><span class="stat-sub">P/L Day</span></div>
-        <div class="stat"><span class="stat-val" style="color:var(--muted)">0.0%</span><span class="stat-sub">Daily Chg</span></div>
-        <div class="stat"><span class="stat-val" style="color:var(--muted)">0</span><span class="stat-sub">Positions</span></div>
+        <div class="stat">
+          <span class="stat-val" style="font-size:16px;color:${dayPlColor}">
+            ${stats.dayPL >= 0 ? '+' : ''}$${this._fmtPrice(stats.dayPL)}
+          </span>
+          <span class="stat-sub">Day P/L</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val" style="font-size:16px;color:${totalPlColor}">
+            ${stats.totalPL >= 0 ? '+' : ''}$${this._fmtPrice(stats.totalPL)}
+          </span>
+          <span class="stat-sub">Total P/L</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val" style="font-size:16px;color:var(--text)">
+            $${this._fmtPrice(stats.portfolioValue)}
+          </span>
+          <span class="stat-sub">${totalPlPct}% total</span>
+        </div>
       </div>
-      <div class="empty-state">TERMINAL ACTIVE<br>MARKET MODULE AWAITING BUILD</div>`);
+
+      <div class="trade-wrap">
+
+        <!-- Watchlist header + add ticker -->
+        <div class="section-head">
+          <span>WATCHLIST</span>
+          <button onclick="TradingModule._fetchAll()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-family:var(--mono);font-size:8px;letter-spacing:1px">REFRESH PRICES</button>
+        </div>
+        <div class="ticker-add-row">
+          <input class="ticker-add-input" id="ticker-add-input" type="text"
+            placeholder="ADD TICKER (e.g. MSFT)"
+            style="text-transform:uppercase"
+            onkeydown="if(event.key==='Enter')TradingModule._addTicker()">
+          <button class="ticker-add-btn" onclick="TradingModule._addTicker()">+ ADD</button>
+        </div>
+
+        <div class="list-area" style="padding:0;gap:8px;margin-bottom:14px">
+          ${watchlistHTML || '<div class="empty-state">NO TICKERS — ADD ONE ABOVE</div>'}
+        </div>
+
+        <!-- Trade panel -->
+        ${tradePanelHTML}
+
+        <!-- Positions -->
+        ${posEntries.length ? `
+          <div class="section-head" style="margin-top:8px">
+            <span>POSITIONS</span>
+            <button class="reset-portfolio-btn" data-action="reset-portfolio">RESET PAPER</button>
+          </div>
+          <div class="list-area" style="padding:0;gap:8px">
+            <div class="cash-bar">
+              <span class="cash-label">CASH BALANCE</span>
+              <span class="cash-val">$${this._fmtPrice(p.cash)}</span>
+            </div>
+            ${positionsHTML}
+          </div>` : `
+          <div class="section-head" style="margin-top:8px">
+            <span>PAPER PORTFOLIO</span>
+            <button class="reset-portfolio-btn" data-action="reset-portfolio">RESET</button>
+          </div>
+          <div class="cash-bar">
+            <span class="cash-label">CASH BALANCE</span>
+            <span class="cash-val">$${this._fmtPrice(p.cash)}</span>
+          </div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;padding:20px">
+            NO POSITIONS — TAP A TICKER ABOVE TO TRADE
+          </div>`}
+
+      </div>`);
+
+    this._bindEvents();
+  },
+
+  _bindEvents() {
+    const content = document.getElementById('main-content');
+    // Store bound refs so teardown can remove them
+    if (!this._boundClick) {
+      this._boundClick = this._handleClick.bind(this);
+      this._boundInput = this._handleInput.bind(this);
+    }
+    content.removeEventListener('click', this._boundClick);
+    content.removeEventListener('input', this._boundInput);
+    content.addEventListener('click', this._boundClick);
+    content.addEventListener('input', this._boundInput);
+  },
+
+  _handleClick(e) {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.dataset.action;
+
+    if (action === 'select-ticker') {
+      const sym = el.dataset.sym;
+      this._state.selectedTicker = this._state.selectedTicker === sym ? null : sym;
+      this._state.tradeShares = '';
+      this._state.tradeErr = '';
+      this._renderActive();
+      return;
+    }
+    if (action === 'remove-ticker') {
+      e.stopPropagation();
+      const sym = el.dataset.sym;
+      this._state.watchlist = this._state.watchlist.filter(s => s !== sym);
+      if (this._state.selectedTicker === sym) { this._state.selectedTicker = null; this._state.tradeErr = ''; }
+      this._saveWatchlist();
+      this._renderActive();
+      return;
+    }
+    if (action === 'trade-mode') {
+      this._state.tradeMode = el.dataset.mode;
+      this._state.tradeShares = '';
+      this._state.tradeErr = '';
+      this._renderActive();
+      return;
+    }
+    if (action === 'execute-trade') {
+      this._executeTrade();
+      return;
+    }
+    if (action === 'reset-portfolio') {
+      if (confirm('Reset paper portfolio to $10,000 cash? This cannot be undone.')) {
+        this._state.portfolio = { cash: 10000, positions: {}, trades: [] };
+        this._savePortfolio();
+        Shell.toast('PAPER PORTFOLIO RESET');
+        this._renderActive();
+      }
+      return;
+    }
+  },
+
+  _handleInput(e) {
+    if (e.target.id === 'trade-shares-input') {
+      this._state.tradeShares = e.target.value;
+      // Update cost display inline without full re-render
+      const shareNum = parseFloat(this._state.tradeShares) || 0;
+      const sym = this._state.selectedTicker;
+      const price = sym ? this._state.quotes[sym]?.price : null;
+      const rows = document.querySelectorAll('.trade-row');
+      if (rows[1] && price) {
+        const v = rows[1].querySelector('.trade-val');
+        if (v) v.textContent = shareNum ? '$' + this._fmtPrice(price * shareNum) : '—';
+      }
+    }
+  },
+
+  _addTicker() {
+    const input = document.getElementById('ticker-add-input');
+    if (!input) return;
+    const sym = input.value.trim().toUpperCase();
+    if (!sym) return;
+    if (this._state.watchlist.includes(sym)) {
+      Shell.toast('ALREADY IN WATCHLIST');
+      input.value = '';
+      return;
+    }
+    this._state.watchlist.push(sym);
+    this._state.quotes[sym] = { price: null, chg: 0, chgPct: 0, name: sym, loading: true, error: false };
+    this._saveWatchlist();
+    input.value = '';
+    this._renderActive();
+    this._fetchQuotes([sym]);
+  },
+
+  _executeTrade() {
+    const sym = this._state.selectedTicker;
+    const sharesNum = parseFloat(this._state.tradeShares);
+    const price = this._state.quotes[sym]?.price;
+
+    if (!price) { this._showErr('PRICE NOT AVAILABLE — REFRESH FIRST'); return; }
+    if (!sharesNum || sharesNum <= 0) { this._showErr('ENTER A VALID SHARE AMOUNT'); return; }
+
+    const p = this._state.portfolio;
+    const cost = price * sharesNum;
+    const mode = this._state.tradeMode;
+
+    if (mode === 'buy') {
+      if (cost > p.cash) { this._showErr(`INSUFFICIENT CASH — NEED $${this._fmtPrice(cost)}`); return; }
+      p.cash -= cost;
+      if (p.positions[sym]) {
+        const existing = p.positions[sym];
+        const totalShares = existing.shares + sharesNum;
+        const totalCost = (existing.avgCost * existing.shares) + cost;
+        existing.avgCost = totalCost / totalShares;
+        existing.shares = totalShares;
+      } else {
+        p.positions[sym] = { shares: sharesNum, avgCost: price };
+      }
+      p.trades.push({ sym, type: 'buy', shares: sharesNum, price, ts: Date.now() });
+      Shell.toast(`▲ BOUGHT ${sharesNum} ${sym} @ $${this._fmtPrice(price)}`);
+    } else {
+      const pos = p.positions[sym];
+      if (!pos || pos.shares < sharesNum) {
+        this._showErr(`INSUFFICIENT SHARES — HELD: ${pos ? pos.shares : 0}`); return;
+      }
+      p.cash += cost;
+      pos.shares -= sharesNum;
+      pos.shares = parseFloat(pos.shares.toFixed(6));
+      if (pos.shares < 0.0001) delete p.positions[sym];
+      p.trades.push({ sym, type: 'sell', shares: sharesNum, price, ts: Date.now() });
+      Shell.toast(`▼ SOLD ${sharesNum} ${sym} @ $${this._fmtPrice(price)}`);
+    }
+
+    this._savePortfolio();
+    this._state.tradeShares = '';
+    this._state.tradeErr = '';
+    this._renderActive();
+  },
+
+  _showErr(msg) {
+    this._state.tradeErr = msg;
+    const el = document.getElementById('trade-err');
+    if (el) el.textContent = msg;
   },
 
   updateClock() {},
-  teardown() {}
+
+  teardown() {
+    if (this._state.refreshTimer) { clearInterval(this._state.refreshTimer); this._state.refreshTimer = null; }
+    const content = document.getElementById('main-content');
+    if (content && this._boundClick) {
+      content.removeEventListener('click', this._boundClick);
+      content.removeEventListener('input', this._boundInput);
+    }
+  }
 };
 
 /* ═══════════════════════════════════════════
    MODULE 00 — GLOBAL DASHBOARD
-   Reads all three storage keys fresh on every
-   mount. No shared state — localStorage IS
-   the bus.
+   Reads all storage keys fresh on every mount.
+   Auto-refreshes stats every 30s.
+   Also reacts to real-time Firebase pushes.
 ═══════════════════════════════════════════ */
 const DashboardModule = {
+
+  _refreshTimer: null,
 
   // Reuse Income math directly — single source of truth
   _incomeStats() {
     const CFG = IncomeModule.CFG;
     try {
-      const raw = localStorage.getItem('truos_schedule_v34');
+      const raw = TruDB.get('truos_schedule_v34');
       const weeks = raw ? JSON.parse(raw) : IncomeModule.emptyWeeks();
       if (!Array.isArray(weeks) || weeks.length !== 2) return { net: 0, hrs: 0, pct: 0, gap: CFG.target };
       const calcs  = weeks.map(w => IncomeModule.calcWeek(w));
@@ -1097,7 +1913,7 @@ const DashboardModule = {
 
   _academicStats() {
     try {
-      const raw  = localStorage.getItem('truos-academic');
+      const raw  = TruDB.get('truos-academic');
       const data = raw ? JSON.parse(raw) : [];
       const now  = new Date();
       const in72 = new Date(now.getTime() + 72 * 36e5);
@@ -1136,6 +1952,18 @@ const DashboardModule = {
   },
 
   init() {
+    this._render();
+
+    // 30s auto-refresh so badges stay live while sitting on Dashboard
+    if (this._refreshTimer) clearInterval(this._refreshTimer);
+    this._refreshTimer = setInterval(() => this._render(), 30000);
+
+    // Real-time push from any device — re-render immediately
+    TruDB.on('truos-academic',       () => this._render());
+    TruDB.on('truos_schedule_v34',   () => this._render());
+  },
+
+  _render() {
     const income   = this._incomeStats();
     const academic = this._academicStats();
     const locked   = this._tradingLocked(academic.overdue);
@@ -1256,7 +2084,9 @@ const DashboardModule = {
     if (de) de.textContent = c.date;
   },
 
-  teardown() {}
+  teardown() {
+    if (this._refreshTimer) { clearInterval(this._refreshTimer); this._refreshTimer = null; }
+  }
 };
 
 /* ═══════════════════════════════════════════
