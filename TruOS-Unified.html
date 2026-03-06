@@ -1,0 +1,2520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TruOS">
+<title>TruOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   SHELL — Tokens & layout
+═══════════════════════════════════════════ */
+:root {
+  --glass:        rgba(255,255,255,0.07);
+  --glass-border: rgba(255,255,255,0.12);
+  --glass-hi:     rgba(255,255,255,0.18);
+  --bg:           #08090a;
+  --amber:        #f5a623;
+  --purple:       #9e61ff;
+  --red:          #ff4757;
+  --red-dim:      rgba(255,71,87,0.12);
+  --green:        #2ed573;
+  --blue:         #1e90ff;
+  --text:         #ffffff;
+  --muted:        rgba(255,255,255,0.45);
+  --sans:         'Syne', sans-serif;
+  --mono:         'Space Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow-x: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(245,166,35,0.18) 0%, transparent 42%),
+    radial-gradient(circle at 88% 82%, rgba(158,97,255,0.16) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, rgba(30,144,255,0.06) 0%, transparent 50%);
+  filter: blur(70px);
+  animation: meshShift 22s ease-in-out infinite alternate;
+}
+@keyframes meshShift {
+  0%   { transform: scale(1) rotate(0deg); }
+  100% { transform: scale(1.25) rotate(6deg); }
+}
+
+#main-content { min-height: 100dvh; padding-bottom: 90px; }
+
+/* ── Sync Badge ── */
+#sync-badge {
+  position: fixed; top: 14px; right: 14px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+  color: var(--muted); z-index: 999; cursor: pointer;
+  padding: 4px 8px; border-radius: 20px;
+  background: rgba(8,9,10,0.6); backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  transition: color 0.3s;
+  user-select: none; -webkit-user-select: none;
+}
+
+/* ── Shell Nav ── */
+.shell-nav {
+  position: fixed; bottom: 0;
+  width: 100%; max-width: 480px;
+  background: rgba(8,9,10,0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--glass-border);
+  display: grid; grid-template-columns: repeat(5,1fr);
+  padding: 10px 0 max(16px, env(safe-area-inset-bottom));
+  z-index: 900;
+}
+.nav-tab {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  cursor: pointer; opacity: 0.32; transition: opacity 0.2s;
+}
+.nav-tab.active { opacity: 1; }
+.nav-tab svg { width: 18px; height: 18px; stroke: var(--muted); }
+.nav-tab.active svg { stroke: var(--amber); }
+.nav-label { font-family: var(--mono); font-size: 7px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.nav-tab.active .nav-label { color: var(--amber); }
+
+/* ── Shell Toast ── */
+#shell-toast {
+  position: fixed; top: 20px; left: 50%;
+  transform: translateX(-50%) translateY(-120px);
+  background: var(--text); color: #000;
+  padding: 10px 24px; border-radius: 30px;
+  font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+  z-index: 9999; white-space: nowrap; pointer-events: none;
+}
+#shell-toast.show { transform: translateX(-50%) translateY(0); }
+#shell-toast.err  { background: var(--red); color: #fff; }
+
+/* ═══════════════════════════════════════════
+   SHARED — Used by all modules
+═══════════════════════════════════════════ */
+.mod-header {
+  padding: 28px 20px 8px;
+  display: flex; justify-content: space-between; align-items: flex-end;
+}
+.sys-label {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 4px;
+  color: var(--muted); text-transform: uppercase; display: block;
+}
+.mod-title { font-size: 26px; font-weight: 800; letter-spacing: -1px; line-height: 1.05; }
+.mod-title em { font-style: normal; color: var(--amber); }
+
+.stats-bar {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 10px; padding: 12px 20px;
+}
+.stat {
+  background: var(--glass); backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border); border-radius: 16px;
+  padding: 12px 10px; text-align: center;
+}
+.stat-val { font-family: var(--mono); font-size: 21px; font-weight: 700; display: block; line-height: 1; }
+.stat-sub { font-family: var(--mono); font-size: 8px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-top: 4px; display: block; }
+
+.pill-row { padding: 8px 20px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.pill-row::-webkit-scrollbar { display: none; }
+
+.pill {
+  padding: 7px 16px; border-radius: 30px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--text); font-family: var(--sans); font-size: 11px; font-weight: 600;
+  white-space: nowrap; cursor: pointer; transition: 0.2s; backdrop-filter: blur(5px);
+}
+.pill.active  { background: var(--text); color: #000; border-color: var(--text); }
+.pill.p-amber { background: var(--amber); color: #000; border-color: var(--amber); }
+
+.list-area { padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 10px; }
+.section-head {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  letter-spacing: 2px; text-transform: uppercase;
+  padding: 12px 4px 4px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.card {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 18px;
+  padding: 15px; display: flex; align-items: center; gap: 14px; transition: 0.2s;
+}
+.card:active { transform: scale(0.985); }
+.card.overdue { border-color: rgba(255,71,87,0.45); background: rgba(255,71,87,0.06); }
+.card.today   { border-color: rgba(245,166,35,0.4);  background: rgba(245,166,35,0.05); }
+.card.done    { opacity: 0.32; filter: grayscale(0.7); }
+
+.checkbox {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--glass-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; cursor: pointer; transition: 0.15s;
+}
+.checkbox.checked { background: var(--green); border-color: var(--green); color: #000; }
+
+.card-body { flex: 1; min-width: 0; }
+.card-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 3px; }
+.card-meta  { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.btn-del    { background: transparent; border: none; color: var(--muted); padding: 5px; cursor: pointer; font-size: 14px; opacity: 0.4; transition: 0.2s; }
+.btn-del:hover { opacity: 1; color: var(--red); }
+.clear-btn  { background: transparent; border: 1px solid rgba(255,71,87,0.4); color: var(--red); font-size: 8px; font-family: var(--mono); padding: 2px 8px; border-radius: 4px; cursor: pointer; letter-spacing: 1px; }
+.empty-state { text-align: center; padding: 50px 20px; color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: 2px; }
+
+.slide-panel {
+  position: fixed; bottom: 0; left: 50%;
+  transform: translateX(-50%) translateY(100%);
+  width: 100%; max-width: 480px;
+  background: rgba(10,10,12,0.96); backdrop-filter: blur(30px);
+  border-radius: 28px 28px 0 0;
+  padding: 28px 20px max(48px,env(safe-area-inset-bottom));
+  transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+  z-index: 800; border-top: 1px solid var(--glass-border);
+}
+.slide-panel.open { transform: translateX(-50%) translateY(0); }
+
+input, select {
+  width: 100%; background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 12px; padding: 12px; color: var(--text); margin-bottom: 10px;
+  font-family: var(--sans); font-size: 14px; outline: none; -webkit-appearance: none;
+}
+input:focus, select:focus { border-color: var(--amber); }
+select option { background: #141416; }
+
+.fab {
+  position: fixed; bottom: 82px; right: 20px;
+  width: 54px; height: 54px; border-radius: 50%;
+  background: var(--text); border: none; color: #000;
+  font-size: 26px; box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+  z-index: 850; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: 0.3s;
+}
+.fab.open { transform: rotate(45deg); background: var(--red-dim); color: var(--red); border: 1px solid var(--red); box-shadow: none; }
+
+
+/* ═══════════════════════════════════════════
+   ACADEMIC v2 — Mental Clarity styles
+═══════════════════════════════════════════ */
+.week-header {
+  padding: 18px 4px 6px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.week-label {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  color: var(--text); letter-spacing: 2px; text-transform: uppercase;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.week-progress-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.week-bar-track {
+  flex: 1; height: 4px; background: rgba(255,255,255,0.08);
+  border-radius: 4px; overflow: hidden;
+}
+.week-bar-fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--green), var(--amber));
+  transition: width 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+.week-bar-label {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  white-space: nowrap;
+}
+.card.soon { border-color: rgba(245,166,35,0.45); background: rgba(245,166,35,0.06); }
+
+.completed-toggle {
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+  letter-spacing: 1px; padding: 14px 4px 6px;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  user-select: none; -webkit-user-select: none;
+}
+.completed-toggle:active { opacity: 0.6; }
+.completed-caret { font-size: 8px; transition: transform 0.2s; }
+.completed-caret.open { transform: rotate(90deg); }
+.completed-list { display: flex; flex-direction: column; gap: 10px; }
+.purge-row { padding: 8px 4px 4px; display: flex; justify-content: flex-end; }
+
+/* ═══════════════════════════════════════════
+   INCOME MODULE — v3.4 FLUID styles
+═══════════════════════════════════════════ */
+.inc-wrap { padding: 0 18px 24px; }
+
+/* Progress card */
+.progress-card {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 20px;
+  padding: 18px; margin-bottom: 16px;
+}
+.pc-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+.pc-net { font-family: var(--mono); font-size: 32px; font-weight: 700; color: var(--green); line-height: 1; }
+.pc-net sup { font-size: 14px; vertical-align: super; }
+.pc-target { text-align: right; }
+.pc-target-val { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--muted); }
+.v-bar { height: 6px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+.v-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--green), var(--amber)); transition: width 0.5s cubic-bezier(0.16,1,0.3,1); }
+.v-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--muted); }
+
+/* Week tabs */
+.week-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.week-tab {
+  flex: 1; padding: 11px; border-radius: 12px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--muted); cursor: pointer; font-family: var(--mono);
+  font-size: 10px; text-align: center; font-weight: 600; transition: 0.2s;
+}
+.week-tab.active { background: var(--green); color: #000; border-color: var(--green); font-weight: 700; }
+
+/* Day rows */
+.day-row {
+  display: grid; grid-template-columns: 72px 1fr auto;
+  align-items: center; gap: 10px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 14px; padding: 12px 14px; margin-bottom: 8px;
+  backdrop-filter: blur(8px);
+}
+.day-name { font-size: 11px; font-weight: 700; color: var(--muted); font-family: var(--mono); letter-spacing: 1px; }
+.day-name.on { color: var(--text); }
+
+.tag-row { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.tag { font-size: 8px; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+.tag-base   { background: rgba(46,213,115,0.12); color: var(--green); }
+.tag-pickup { background: rgba(245,166,35,0.12);  color: var(--amber); }
+.tag-wknd   { background: rgba(30,144,255,0.12);  color: var(--blue); }
+.tag-ot     { background: rgba(255,71,87,0.12);   color: var(--red); border: 1px solid rgba(255,71,87,0.25); }
+
+.chip-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.chip {
+  padding: 5px 9px; border-radius: 6px;
+  border: 1px solid var(--glass-border); background: rgba(255,255,255,0.04);
+  color: var(--muted); font-family: var(--mono); font-size: 10px;
+  cursor: pointer; transition: 0.15s; font-weight: 600;
+}
+.chip.active { border-color: var(--green); color: var(--green); background: rgba(46,213,115,0.08); }
+.chip.active-w { border-color: var(--amber); color: var(--amber); background: rgba(245,166,35,0.08); }
+.chip-remove { color: var(--red); border: none; background: transparent; cursor: pointer; font-size: 16px; padding: 2px 8px; line-height: 1; }
+
+.day-earn { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--muted); text-align: right; white-space: nowrap; }
+.day-earn.on { color: var(--green); }
+
+/* Clear row */
+.inc-clear-row { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+
+/* ═══════════════════════════════════════════
+   DASHBOARD MODULE
+═══════════════════════════════════════════ */
+.dash-wrap { padding: 0 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.dash-status {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 20px;
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 4px;
+}
+.dash-status-line {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; text-align: center; line-height: 1.6;
+}
+.dash-card {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 18px;
+  padding: 16px 18px; cursor: pointer; transition: background 0.2s;
+}
+.dash-card:active { background: var(--glass-hi); }
+.dash-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.dash-card-label { font-family: var(--mono); font-size: 8px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+.dash-card-badge { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; }
+.badge-ok     { background: rgba(46,213,115,0.15); color: var(--green); }
+.badge-warn   { background: rgba(255,71,87,0.15);  color: var(--red); }
+.badge-locked { background: rgba(245,166,35,0.15); color: var(--amber); }
+.badge-clear  { background: rgba(46,213,115,0.15); color: var(--green); }
+.dash-val { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.dash-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.dash-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
+.dash-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(0.16,1,0.3,1); }
+.dash-next-due { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--glass-border); }
+.dash-next-due strong { color: var(--text); }
+.dash-tap-hint { font-family: var(--mono); font-size: 8px; color: var(--muted); text-align: right; margin-top: 6px; letter-spacing: 1px; }
+
+/* Export button */
+.export-btn {
+  position: fixed; bottom: 82px; left: 20px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px); border-radius: 30px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
+  color: var(--muted); padding: 8px 14px; cursor: pointer;
+  z-index: 800; transition: 0.2s; white-space: nowrap;
+}
+.export-btn:active { background: var(--glass-hi); color: var(--text); }
+
+/* ═══════════════════════════════════════════
+   TRADING TERMINAL — v1
+═══════════════════════════════════════════ */
+.locked-wrap {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 70dvh; gap: 16px; padding: 40px 30px; text-align: center;
+}
+.locked-icon { font-size: 48px; opacity: 0.25; }
+.locked-title { font-size: 22px; font-weight: 800; color: var(--muted); }
+.locked-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; line-height: 2; }
+
+.trade-wrap { padding: 0 18px 100px; }
+
+.market-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  padding: 4px 10px; border-radius: 20px;
+}
+.market-badge.open  { background: rgba(46,213,115,0.15); color: var(--green); }
+.market-badge.closed { background: rgba(255,255,255,0.08); color: var(--muted); }
+
+.ticker-card {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 16px;
+  padding: 14px 16px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 12px;
+}
+.ticker-sym { font-family: var(--mono); font-size: 14px; font-weight: 700; min-width: 48px; }
+.ticker-price { font-family: var(--mono); font-size: 16px; font-weight: 700; }
+.ticker-chg { font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+.ticker-chg.pos { background: rgba(46,213,115,0.15); color: var(--green); }
+.ticker-chg.neg { background: rgba(255,71,87,0.15);  color: var(--red); }
+.ticker-chg.neu { background: rgba(255,255,255,0.08); color: var(--muted); }
+.ticker-age { font-family: var(--mono); font-size: 8px; color: var(--muted); margin-left: auto; }
+.ticker-actions { display: flex; gap: 6px; }
+.trade-btn {
+  font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; transition: 0.15s;
+}
+.trade-btn.buy  { background: rgba(46,213,115,0.2);  color: var(--green); }
+.trade-btn.sell { background: rgba(255,71,87,0.2);   color: var(--red); }
+.trade-btn.del  { background: transparent; color: var(--muted); font-size: 12px; padding: 4px 8px; }
+.trade-btn:active { filter: brightness(1.3); }
+
+.position-card {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 14px; padding: 13px 15px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 10px;
+}
+.pos-sym { font-family: var(--mono); font-size: 13px; font-weight: 700; min-width: 48px; }
+.pos-shares { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.pos-val { font-family: var(--mono); font-size: 14px; font-weight: 700; margin-left: auto; text-align: right; }
+.pos-pl { font-family: var(--mono); font-size: 9px; }
+.pos-pl.pos { color: var(--green); }
+.pos-pl.neg { color: var(--red); }
+
+.trade-section-label {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); padding: 14px 2px 8px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+.cash-row {
+  background: var(--glass); border: 1px solid var(--glass-border); border-radius: 14px;
+  padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.cash-label { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+.cash-val { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--green); }
+
+.add-ticker-row {
+  display: flex; gap: 8px; margin-bottom: 14px;
+}
+.add-ticker-row input {
+  margin: 0; text-transform: uppercase; font-family: var(--mono);
+  flex: 1;
+}
+.add-ticker-row button {
+  padding: 12px 18px; border-radius: 12px; border: 1px solid var(--amber);
+  background: rgba(245,166,35,0.1); color: var(--amber);
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+
+/* Trade panel */
+.trade-panel-title {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
+}
+.trade-panel-ticker { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+.trade-panel-price { font-family: var(--mono); font-size: 14px; color: var(--muted); margin-bottom: 18px; }
+.trade-panel-total { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+.trade-panel-total strong { color: var(--text); }
+.btn-primary {
+  width: 100%; padding: 15px; border-radius: 14px; border: none;
+  font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 1px;
+  cursor: pointer; transition: 0.2s;
+}
+.btn-buy  { background: var(--green); color: #000; }
+.btn-sell { background: var(--red);   color: #fff; }
+.btn-primary:active { filter: brightness(0.9); }
+.btn-cancel {
+  width: 100%; padding: 10px; margin-top: 8px; border-radius: 14px;
+  border: 1px solid var(--glass-border); background: transparent;
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════
+   SPENDING TRACKER — Expense management
+═══════════════════════════════════════════ */
+.spend-wrap { padding: 0 18px 100px; }
+
+.spend-summary {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 18px;
+}
+
+.spend-card {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 16px;
+  padding: 14px; text-align: center;
+}
+
+.spend-card-amount { font-family: var(--mono); font-size: 22px; font-weight: 700; display: block; margin-bottom: 4px; }
+.spend-card-label { font-family: var(--mono); font-size: 8px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+.spend-filters { padding: 12px 18px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.spend-filters::-webkit-scrollbar { display: none; }
+
+.spend-filter-btn {
+  padding: 7px 14px; border-radius: 20px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--text); font-family: var(--sans); font-size: 11px; font-weight: 600;
+  white-space: nowrap; cursor: pointer; transition: 0.2s; backdrop-filter: blur(5px);
+}
+
+.spend-filter-btn.active { background: var(--green); color: #000; border-color: var(--green); }
+
+.spend-list { padding: 4px 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+
+.spend-tx {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 14px;
+  padding: 13px 15px; display: flex; align-items: center; gap: 12px;
+  transition: 0.2s;
+}
+
+.spend-tx:active { background: var(--glass-hi); }
+
+.spend-tx-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+
+.spend-tx-body { flex: 1; min-width: 0; }
+.spend-tx-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
+.spend-tx-meta { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+.spend-tx-amount { font-family: var(--mono); font-size: 14px; font-weight: 700; text-align: right; }
+.spend-tx-delete { background: transparent; border: none; color: var(--muted); padding: 5px; cursor: pointer; font-size: 14px; opacity: 0.4; transition: 0.2s; }
+.spend-tx-delete:hover { opacity: 1; color: var(--red); }
+
+.spend-category-badge {
+  display: inline-block; font-family: var(--mono); font-size: 7px;
+  padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.cat-food    { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.cat-transport { background: rgba(74, 144, 226, 0.15); color: #4a90e2; }
+.cat-utility { background: rgba(156, 39, 176, 0.15); color: #9c27b0; }
+.cat-entertainment { background: rgba(255, 193, 7, 0.15); color: #ffc107; }
+.cat-shopping { background: rgba(233, 30, 99, 0.15); color: #e91e63; }
+.cat-health  { background: rgba(76, 175, 80, 0.15); color: #4caf50; }
+.cat-other   { background: rgba(158, 158, 158, 0.15); color: #9e9e9e; }
+
+.spend-chart {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 16px;
+  padding: 16px; margin: 0 18px 18px;
+}
+
+.spend-chart-title { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; }
+
+.spend-chart-bars { display: flex; gap: 6px; align-items: flex-end; height: 80px; margin-bottom: 8px; }
+.spend-chart-bar { flex: 1; background: var(--glass-hi); border-radius: 4px 4px 0 0; cursor: pointer; position: relative; transition: 0.2s; }
+.spend-chart-bar:hover { opacity: 0.8; }
+.spend-chart-label { font-family: var(--mono); font-size: 7px; text-align: center; color: var(--muted); margin-top: 4px; }
+
+.spend-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: 2px; }
+
+/* ═══════════════════════════════════════════
+   MOBILE UX — Touch optimization & feel
+═══════════════════════════════════════════ */
+* { touch-action: manipulation; }
+input, select, textarea { touch-action: auto; }
+
+.nav-tab { min-height: 44px; padding: 6px 2px; }
+.nav-tab svg { width: 20px; height: 20px; }
+
+.chip {
+  min-height: 36px; padding: 7px 11px;
+  display: inline-flex; align-items: center;
+}
+.chip:active { opacity: 0.65; transform: scale(0.93); }
+.checkbox { width: 28px; height: 28px; font-size: 12px; }
+.btn-del { padding: 8px 12px; min-height: 36px; }
+.pill { padding: 9px 18px; min-height: 38px; display: inline-flex; align-items: center; }
+.pill:active { transform: scale(0.96); }
+.card { padding: 16px 15px; }
+.card:active { transform: scale(0.982); background: var(--glass-hi); }
+.nav-tab:active { opacity: 0.55; }
+.fab { width: 58px; height: 58px; font-size: 28px; bottom: 88px; }
+.day-row { padding: 14px; min-height: 52px; }
+.week-tab { min-height: 44px; }
+.card-title { font-size: 14.5px; }
+
+.list-area  { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+.inc-wrap   { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+.trade-wrap { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+.dash-wrap  { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+.pill-row   { -webkit-overflow-scrolling: touch; }
+
+/* ═══════════════════════════════════════════
+   AMBIENT ALERTS — Urgency indicators
+═══════════════════════════════════════════ */
+@keyframes urgentPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(1.4); }
+}
+.urgent-pulse { animation: urgentPulse 1.5s ease-in-out infinite; }
+.alert-dot {
+  position: absolute; width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid var(--bg); pointer-events: none;
+  top: 2px; right: calc(50% - 14px);
+}
+.nav-tab { position: relative; }
+
+/* ═══════════════════════════════════════════
+   STUDY PLANNER — Module 04
+═══════════════════════════════════════════ */
+.plan-wrap { padding: 4px 20px 100px; }
+.plan-legend {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  padding: 0 2px 14px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+  color: var(--muted); text-transform: uppercase;
+}
+.plan-legend-item { display: flex; align-items: center; gap: 5px; }
+.plan-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.plan-day {
+  background: var(--glass); backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border); border-radius: 16px;
+  padding: 13px 15px; margin-bottom: 8px; transition: 0.2s;
+}
+.plan-day.plan-past { opacity: 0.38; }
+.plan-day.plan-today {
+  border-color: var(--amber); opacity: 1;
+  background: rgba(245,166,35,0.05);
+}
+.plan-day-header {
+  display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px;
+}
+.plan-day-name {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  color: var(--muted); letter-spacing: 2px; min-width: 32px;
+}
+.plan-today .plan-day-name { color: var(--amber); }
+.plan-day-date { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.plan-today .plan-day-date { color: var(--text); font-weight: 700; }
+
+.plan-day-body { display: flex; flex-direction: column; gap: 5px; }
+.plan-shifts { display: flex; flex-wrap: wrap; gap: 5px; }
+.plan-shift-tag {
+  font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  padding: 3px 8px; border-radius: 6px;
+  background: rgba(245,166,35,0.15); color: var(--amber);
+  border: 1px solid rgba(245,166,35,0.3);
+}
+.plan-assign {
+  font-family: var(--mono); font-size: 10px; padding: 5px 8px; border-radius: 6px;
+  background: rgba(30,144,255,0.1); border: 1px solid rgba(30,144,255,0.25);
+  color: var(--blue); display: flex; align-items: center; justify-content: space-between;
+}
+.plan-assign.overdue { background: rgba(255,71,87,0.1); border-color: rgba(255,71,87,0.3); color: var(--red); }
+.plan-assign.today   { background: rgba(245,166,35,0.1); border-color: rgba(245,166,35,0.3); color: var(--amber); }
+.plan-assign.soon    { background: rgba(245,166,35,0.07); border-color: rgba(245,166,35,0.2); color: var(--amber); }
+.plan-class { font-size: 8px; opacity: 0.6; margin-left: 6px; flex-shrink: 0; }
+.plan-conflict {
+  font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  padding: 5px 8px; border-radius: 6px;
+  background: rgba(255,71,87,0.08); border: 1px solid rgba(255,71,87,0.25); color: var(--red);
+}
+.plan-clear { font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.15); }
+.plan-conflict-summary {
+  background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3);
+  border-radius: 14px; padding: 12px 15px; margin-bottom: 12px;
+  font-family: var(--mono); font-size: 11px; color: var(--red); font-weight: 700; letter-spacing: 1px;
+  text-align: center;
+}
+.plan-ok-summary {
+  background: rgba(46,213,115,0.08); border: 1px solid rgba(46,213,115,0.25);
+  border-radius: 14px; padding: 12px 15px; margin-bottom: 12px;
+  font-family: var(--mono); font-size: 11px; color: var(--green); font-weight: 700; letter-spacing: 1px;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<div id="shell-toast"></div>
+<div id="sync-badge" onclick="TruDB.copyUID()" title="Tap to copy device UID">○ OFFLINE</div>
+<div id="main-content"></div>
+<button class="export-btn" onclick="Shell.exportState()" title="Export with data">⬇ EXPORT</button>
+
+<nav class="shell-nav" id="shell-nav">
+  <div class="nav-tab active" data-mod="dashboard">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+    <span class="nav-label">Home</span>
+  </div>
+  <div class="nav-tab" data-mod="income">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="1" x2="12" y2="23"/>
+      <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+    </svg>
+    <span class="nav-label">Income</span>
+  </div>
+  <div class="nav-tab" data-mod="academic">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/>
+      <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+    </svg>
+    <span class="nav-label">Academic</span>
+  </div>
+  <div class="nav-tab" data-mod="trading">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+      <polyline points="16 7 22 7 22 13"/>
+    </svg>
+    <span class="nav-label">Trading</span>
+  </div>
+  <div class="nav-tab" data-mod="spending">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+      <line x1="1" y1="10" x2="23" y2="10"/>
+    </svg>
+    <span class="nav-label">Spending</span>
+  </div>
+  <div class="nav-tab" data-mod="planner">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+      <line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+    <span class="nav-label">Planner</span>
+  </div>
+</nav>
+
+<!-- Firebase compat SDK (v9 compat — CDN, no build step) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════════ */
+const MS_PER_HOUR    = 3_600_000;
+const MS_PER_WEEK    = 7 * 24 * MS_PER_HOUR;
+const MAX_ASSIGNMENTS = 100;
+
+/* ═══════════════════════════════════════════
+   TRUDB — localStorage + Firebase sync layer
+   Falls back gracefully to offline-only mode.
+═══════════════════════════════════════════ */
+const TruDB = {
+  _db:        null,
+  _uid:       null,
+  _listeners: {},   // { key: [{ref, fn}] }
+  _badge:     null,
+
+  async init() {
+    this._badge = document.getElementById('sync-badge');
+
+    // ─────────────────────────────────────────────────────────────
+    // Fill in your Firebase config values from Firebase Console →
+    // Project Settings → Your apps → SDK setup and configuration
+    // ─────────────────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            'FILL_IN',
+      authDomain:        'realtime-database-ebc45.firebaseapp.com',
+      databaseURL:       'https://realtime-database-ebc45-default-rtdb.firebaseio.com',
+      projectId:         'realtime-database-ebc45',
+      storageBucket:     'realtime-database-ebc45.appspot.com',
+      messagingSenderId: 'FILL_IN',
+      appId:             'FILL_IN'
+    };
+
+    // If config is placeholder, skip Firebase entirely (offline mode)
+    if (firebaseConfig.apiKey === 'FILL_IN') {
+      this._setBadge('○ OFFLINE', 'var(--muted)');
+      return;
+    }
+
+    try {
+      firebase.initializeApp(firebaseConfig);
+      this._db = firebase.database();
+      this._setBadge('○ OFFLINE', 'var(--muted)');
+
+      const cred = await firebase.auth().signInAnonymously();
+      this._uid = cred.user.uid;
+
+      // Persist UID so user can add it to Firebase security rules
+      if (!localStorage.getItem('truos-owner-uid')) {
+        localStorage.setItem('truos-owner-uid', this._uid);
+      }
+      this._setBadge('● SYNCED', 'var(--green)');
+    } catch (err) {
+      console.warn('[TruDB] Firebase unavailable — offline mode', err);
+      this._setBadge('○ OFFLINE', 'var(--muted)');
+    }
+  },
+
+  _setBadge(text, color) {
+    if (!this._badge) return;
+    this._badge.textContent = text;
+    this._badge.style.color = color;
+  },
+
+  // Always reads from localStorage cache (instant, works offline)
+  get(key) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return raw; }
+  },
+
+  // Writes to localStorage AND Firebase simultaneously
+  set(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+    if (!this._db || !this._uid) return;
+    this._setBadge('↑ SYNCING', 'var(--amber)');
+    this._db.ref(`users/${this._uid}/${key}`).set(value)
+      .then(() => this._setBadge('● SYNCED', 'var(--green)'))
+      .catch(() => this._setBadge('○ OFFLINE', 'var(--muted)'));
+  },
+
+  // Real-time listener — fires when another device updates the key
+  on(key, cb) {
+    if (!this._db || !this._uid) return;
+    const ref = this._db.ref(`users/${this._uid}/${key}`);
+    const fn = ref.on('value', snap => {
+      const val = snap.val();
+      if (val !== null) {
+        localStorage.setItem(key, JSON.stringify(val));
+        cb(val);
+      }
+    });
+    if (!this._listeners[key]) this._listeners[key] = [];
+    this._listeners[key].push({ ref, fn });
+  },
+
+  off(key) {
+    (this._listeners[key] || []).forEach(({ ref, fn }) => ref.off('value', fn));
+    delete this._listeners[key];
+  },
+
+  offAll() {
+    Object.keys(this._listeners).forEach(k => this.off(k));
+  },
+
+  copyUID() {
+    const uid = localStorage.getItem('truos-owner-uid');
+    if (!uid) { Shell.toast('NO UID — FIREBASE NOT CONNECTED', true); return; }
+    navigator.clipboard.writeText(uid).then(
+      () => Shell.toast('UID COPIED — PASTE INTO FIREBASE RULES'),
+      () => Shell.toast('UID: ' + uid)
+    );
+  }
+};
+
+/* ═══════════════════════════════════════════
+   SHELL
+═══════════════════════════════════════════ */
+const Shell = {
+  _active: null,
+  _clockInterval: null,
+  modules: {},
+
+  init() {
+    document.getElementById('shell-nav').addEventListener('click', e => {
+      const tab = e.target.closest('[data-mod]');
+      if (tab) this.switchTo(tab.dataset.mod);
+    });
+    this.switchTo('dashboard');
+  },
+
+  switchTo(name) {
+    const mod = this.modules[name];
+    if (!mod) return;
+    if (this._active?.teardown) this._active.teardown();
+    TruDB.offAll();
+    if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.mod === name));
+    document.querySelectorAll('.slide-panel, .fab').forEach(el => el.remove());
+    this._active = mod;
+    mod.init();
+    // Refresh urgency dot after each module switch
+    setTimeout(() => { if (typeof AmbientAlerts !== 'undefined') AmbientAlerts.check(); }, 50);
+    if (mod.updateClock) {
+      mod.updateClock();
+      this._clockInterval = setInterval(() => mod.updateClock(), 1000);
+    }
+  },
+
+  exportState() {
+    const state = {
+      'truos-academic':           localStorage.getItem('truos-academic')           || '[]',
+      'truos-ac-filter':          localStorage.getItem('truos-ac-filter')          || 'all',
+      'truos_schedule_v34':       localStorage.getItem('truos_schedule_v34')       || 'null',
+      'truos-trading-portfolio':  localStorage.getItem('truos-trading-portfolio')  || 'null',
+      'truos-trading-watchlist':  localStorage.getItem('truos-trading-watchlist')  || 'null',
+    };
+
+    const html = document.documentElement.outerHTML;
+
+    const bootstrap = `
+<script id="truos-state-bootstrap">
+(function(){
+  const state = ${JSON.stringify(state)};
+  Object.entries(state).forEach(([k,v]) => { if(v && v !== 'null') localStorage.setItem(k,v); });
+  document.getElementById('truos-state-bootstrap').remove();
+})();
+<\/script>`;
+
+    const parts    = html.split('<\/body>');
+    const exported = parts[0] + bootstrap + '\n<\/body>' + (parts[1] || '');
+
+    const blob = new Blob([exported], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'TruOS-Unified.html'; a.click();
+    URL.revokeObjectURL(url);
+    Shell.toast('STATE EXPORTED — OPEN ON ANY DEVICE');
+  },
+
+  toast(msg, isErr = false) {
+    const t = document.getElementById('shell-toast');
+    t.textContent = msg;
+    t.className = 'show' + (isErr ? ' err' : '');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.className = '', 2400);
+  }
+};
+
+/* ── Shared utils ── */
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function mount(html) { document.getElementById('main-content').innerHTML = html; }
+function nowClock() {
+  return {
+    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    date: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()
+  };
+}
+
+/* ═══════════════════════════════════════════
+   MODULE 01 — INCOME OPTIMIZER v3.4
+═══════════════════════════════════════════ */
+const IncomeModule = {
+
+  CFG: {
+    baseRate:    17.31,
+    diffs:       { afternoon: 2.50, midnight: 2.75, weekend: 2.00 },
+    tax:         0.192,
+    otThreshold: 40,
+    target:      2000
+  },
+
+  DAYS: ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+
+  state: { weeks: null, activeWeek: 0 },
+  _handler: null,
+
+  calculateShiftGross(isWeekend, cumHrsBefore, duration) {
+    const { baseRate, diffs, otThreshold } = this.CFG;
+    const wknd     = isWeekend ? diffs.weekend : 0;
+    const blockAHrs = Math.min(duration, 4.5);
+    const blockBHrs = Math.max(0, duration - blockAHrs);
+
+    const blocks = [
+      { hrs: blockAHrs, rate: baseRate + diffs.afternoon + wknd },
+      { hrs: blockBHrs, rate: baseRate + diffs.midnight  + wknd }
+    ];
+
+    let shiftTotal = 0, runningCumHrs = cumHrsBefore;
+    blocks.forEach(block => {
+      if (block.hrs <= 0) return;
+      const regInBlock = Math.min(block.hrs, Math.max(0, otThreshold - runningCumHrs));
+      const otInBlock  = block.hrs - regInBlock;
+      shiftTotal      += (regInBlock * block.rate) + (otInBlock * block.rate * 1.5);
+      runningCumHrs   += block.hrs;
+    });
+    return shiftTotal;
+  },
+
+  toNet(gross) { return gross * (1 - this.CFG.tax); },
+
+  emptyWeeks() {
+    return [0,1].map(() =>
+      this.DAYS.reduce((acc, d) => ({ ...acc, [d]: { type: 'off', hrs: 12 } }), {})
+    );
+  },
+
+  calcWeek(week) {
+    let totalGross = 0, cumHrs = 0;
+    const days = {};
+    this.DAYS.forEach(day => {
+      const s = week[day];
+      if (s.type === 'off') { days[day] = { ...s, gross: 0, net: 0, otHrs: 0 }; return; }
+      const gross   = this.calculateShiftGross(s.type === 'wknd', cumHrs, s.hrs);
+      const otTotal = Math.max(0, (cumHrs + s.hrs) - this.CFG.otThreshold);
+      const shiftOT = Math.min(s.hrs, otTotal);
+      days[day]     = { ...s, gross, net: this.toNet(gross), otHrs: shiftOT };
+      totalGross   += gross;
+      cumHrs       += s.hrs;
+    });
+    return { days, totalGross, totalNet: this.toNet(totalGross), totalHrs: cumHrs };
+  },
+
+  getCombined(weekCalcs) {
+    const gross = weekCalcs[0].totalGross + weekCalcs[1].totalGross;
+    return { gross, net: this.toNet(gross), hrs: weekCalcs[0].totalHrs + weekCalcs[1].totalHrs };
+  },
+
+  fmt(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+
+  init() {
+    try {
+      const raw = TruDB.get('truos_schedule_v34');
+      this.state.weeks = Array.isArray(raw) && raw.length === 2 ? raw : this.emptyWeeks();
+    } catch {
+      this.state.weeks = this.emptyWeeks();
+    }
+    this.state.activeWeek = 0;
+    this.render();
+    this.bindEvents();
+  },
+
+  save() {
+    TruDB.set('truos_schedule_v34', this.state.weeks);
+  },
+
+  updateDay(wi, day, type, hrs) {
+    this.state.weeks[wi] = { ...this.state.weeks[wi], [day]: { type, hrs } };
+    this.save();
+    this.render();
+  },
+
+  updateClock() {
+    const c  = nowClock();
+    const te = document.getElementById('inc-time');
+    const de = document.getElementById('inc-date');
+    if (te) te.textContent = c.time;
+    if (de) de.textContent = c.date;
+  },
+
+  render() {
+    const weekCalcs = this.state.weeks.map(w => this.calcWeek(w));
+    const combined  = this.getCombined(weekCalcs);
+    const remaining = Math.max(0, this.CFG.target - combined.net);
+    const pct       = Math.min(100, (combined.net / this.CFG.target) * 100);
+    const aw        = this.state.activeWeek;
+    const wc        = weekCalcs[aw];
+
+    const tabsHTML = [0,1].map(wi => `
+      <div class="week-tab${aw === wi ? ' active' : ''}" data-action="week-tab" data-wi="${wi}">
+        WEEK ${wi+1} · ${weekCalcs[wi].totalHrs}H
+      </div>`).join('');
+
+    const daysHTML = this.DAYS.map(day => {
+      const s    = wc.days[day];
+      const isOn = s.type !== 'off';
+      const tagType = s.type === 'wknd' ? 'wknd' : s.type === 'base' ? 'base' : 'pickup';
+
+      const typeChips = ['base','pickup','wknd'].map(t => {
+        const active = s.type === t;
+        const cls = active ? (t === 'wknd' ? 'chip active-w' : 'chip active') : 'chip';
+        return `<button class="${cls}" data-action="set-type" data-day="${day}" data-type="${t}" data-hrs="${s.hrs}">${t[0].toUpperCase()}</button>`;
+      }).join('');
+
+      const hrsChips = isOn ? [8,12].map(h =>
+        `<button class="chip${s.hrs===h?' active':''}" data-action="set-hrs" data-day="${day}" data-type="${s.type}" data-hrs="${h}">${h}H</button>`
+      ).join('') : '';
+
+      const removeBtn = isOn
+        ? `<button class="chip-remove" data-action="remove-day" data-day="${day}">✕</button>`
+        : '';
+
+      return `
+        <div class="day-row">
+          <div>
+            <div class="day-name${isOn ? ' on' : ''}">${day.substring(0,3).toUpperCase()}</div>
+            ${isOn ? `<div class="tag-row">
+              <span class="tag tag-${tagType}">${s.hrs}H ${s.type}</span>
+              ${s.otHrs > 0 ? `<span class="tag tag-ot">${s.otHrs}H OT</span>` : ''}
+            </div>` : ''}
+          </div>
+          <div>
+            <div class="chip-row">${typeChips}${removeBtn}</div>
+            ${isOn ? `<div class="chip-row">${hrsChips}</div>` : ''}
+          </div>
+          <div class="day-earn${isOn ? ' on' : ''}">
+            ${isOn ? `$${Math.round(s.net)}` : '—'}
+          </div>
+        </div>`;
+    }).join('');
+
+    const gapColor = remaining > 0 ? 'var(--red)' : 'var(--green)';
+    const gapText  = remaining > 0 ? `GAP: -$${this.fmt(remaining)}` : '✓ GOAL REACHED';
+
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 01</span>
+          <h1 class="mod-title">Income<br><em>Optimizer</em></h1>
+        </div>
+        <div style="text-align:right">
+          <div class="sys-label" id="inc-date"></div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:700;" id="inc-time"></div>
+        </div>
+      </header>
+
+      <div class="inc-wrap">
+
+        <div class="progress-card">
+          <div class="pc-top">
+            <div>
+              <div class="sys-label" style="margin-bottom:5px">Biweekly Net</div>
+              <div class="pc-net"><sup>$</sup>${this.fmt(combined.net)}</div>
+            </div>
+            <div class="pc-target">
+              <div class="pc-target-val">$${this.CFG.target}</div>
+              <div class="sys-label" style="margin-top:2px">target</div>
+            </div>
+          </div>
+          <div class="v-bar"><div class="v-fill" style="width:${pct}%"></div></div>
+          <div class="v-meta">
+            <span>${pct.toFixed(1)}% complete · ${combined.hrs}H scheduled</span>
+            <span style="color:${gapColor}">${gapText}</span>
+          </div>
+        </div>
+
+        <div class="stats-bar" style="padding:0 0 16px">
+          <div class="stat">
+            <span class="stat-val" style="color:var(--green)">$${Math.round(combined.net)}</span>
+            <span class="stat-sub">Net Pay</span>
+          </div>
+          <div class="stat">
+            <span class="stat-val" style="color:var(--amber)">$${Math.round(combined.gross)}</span>
+            <span class="stat-sub">Gross</span>
+          </div>
+          <div class="stat">
+            <span class="stat-val" style="color:var(--muted)">${combined.hrs}H</span>
+            <span class="stat-sub">Hours</span>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="sys-label">Schedule Builder</div>
+          <button class="clear-btn" data-action="clear-all">CLEAR</button>
+        </div>
+        <div class="week-tabs">${tabsHTML}</div>
+
+        <div id="days-grid">${daysHTML}</div>
+
+      </div>
+    `);
+
+    this.updateClock();
+  },
+
+  bindEvents() {
+    const wrap = document.getElementById('main-content');
+    if (!wrap || wrap._incBound) return;
+    wrap._incBound = true;
+
+    this._handler = e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const { action, wi, day, type, hrs } = btn.dataset;
+      const aw = this.state.activeWeek;
+
+      if (action === 'week-tab') {
+        this.state.activeWeek = +wi;
+        this.render(); return;
+      }
+      if (action === 'clear-all') {
+        if (confirm('Clear both weeks?')) {
+          this.state.weeks = this.emptyWeeks();
+          this.save(); this.render();
+        }
+        return;
+      }
+      if (action === 'set-type')  { this.updateDay(aw, day, type, +hrs); return; }
+      if (action === 'set-hrs')   { this.updateDay(aw, day, type, +hrs); return; }
+      if (action === 'remove-day') { this.updateDay(aw, day, 'off', 12); return; }
+    };
+
+    wrap.addEventListener('click', this._handler);
+  },
+
+  teardown() {
+    const wrap = document.getElementById('main-content');
+    if (wrap) {
+      wrap._incBound = false;
+      if (this._handler) wrap.removeEventListener('click', this._handler);
+      this._handler = null;
+    }
+  }
+};
+
+/* ═══════════════════════════════════════════
+   MODULE 02 — ACADEMIC TRACKER v2
+═══════════════════════════════════════════ */
+const AcademicModule = {
+  CFG:   { class1: "MAT 151 (Math)", class2: "PSY 101 (Psych)" },
+  state: { assignments: [], filter: 'all', completedOpen: false },
+
+  init() {
+    try {
+      const raw = TruDB.get('truos-academic');
+      this.state.assignments = Array.isArray(raw) ? raw : [];
+    } catch {
+      this.state.assignments = [];
+    }
+    this.state.filter = localStorage.getItem('truos-ac-filter') || 'all';
+    this.render();
+  },
+
+  importICS(text) {
+    const events = [];
+    const blocks = text.split('BEGIN:VEVENT');
+    blocks.shift();
+
+    blocks.forEach(block => {
+      const titleMatch = block.match(/SUMMARY:(.*(?:\r?\n\s.*)*)/);
+      let fullTitle    = titleMatch ? titleMatch[1].replace(/\r?\n\s/g, '').trim() : 'Untitled';
+      let displayTitle = fullTitle.split('[')[0].trim();
+
+      // Handle Canvas DTSTART;VALUE=DATE;VALUE=DATE: double-tag and other formats
+      const dateMatch = block.match(/DTSTART[:;].*?(\d{8})/);
+      if (!dateMatch || fullTitle.includes('OFFICE HOURS')) return;
+
+      const d      = dateMatch[1];
+      const dueStr = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}T23:59:00`;
+      const cls    = fullTitle.includes('MAT 151') ? 'c1' : 'c2';
+
+      events.push({ id: 'ac-' + Math.random().toString(36).substr(2,9), title: displayTitle, due: dueStr, cls, done: false });
+    });
+
+    // Merge with update-in-place logic:
+    // - Same title+cls, different due  → update due in place, keep done state
+    // - Same title+cls+due             → skip (true duplicate)
+    // - New title                      → add
+    const existing = TruDB.get('truos-academic') || [];
+    const result   = existing.map(a => ({ ...a })); // mutable copy
+
+    let added = 0, updated = 0;
+    events.forEach(evt => {
+      const match = result.find(x => x.title === evt.title && x.cls === evt.cls);
+      if (!match) {
+        if (result.length < MAX_ASSIGNMENTS) { result.push(evt); added++; }
+      } else if (match.due !== evt.due) {
+        match.due = evt.due; updated++;
+      }
+      // exact dup → skip
+    });
+
+    if (result.length >= MAX_ASSIGNMENTS) {
+      Shell.toast(`LIMIT: MAX ${MAX_ASSIGNMENTS} ASSIGNMENTS`, true);
+    }
+
+    this.state.assignments = result;
+    this.save();
+    Shell.toast(`SYNCED: +${added} NEW${updated ? ' · ' + updated + ' UPDATED' : ''}`);
+  },
+
+  save() {
+    TruDB.set('truos-academic', this.state.assignments);
+    localStorage.setItem('truos-ac-filter', this.state.filter);
+    this.render();
+  },
+
+  urgency(due, done) {
+    if (done) return 'done';
+    const hours = (new Date(due) - new Date()) / MS_PER_HOUR;
+    if (hours < 0)  return 'overdue';
+    if (hours < 24) return 'today';
+    if (hours < 72) return 'soon';
+    return 'upcoming';
+  },
+
+  _weekNum(dueDate, minDate) {
+    return Math.floor((new Date(dueDate) - minDate) / MS_PER_WEEK) + 1;
+  },
+
+  _card(a) {
+    const u  = this.urgency(a.due, a.done);
+    const dt = new Date(a.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `
+      <div class="card ${a.done ? 'done' : u}">
+        <div class="checkbox ${a.done ? 'checked' : ''}" onclick="AcademicModule.toggle('${a.id}')">${a.done ? '✓' : ''}</div>
+        <div class="card-body">
+          <div class="card-title">${esc(a.title)}</div>
+          <div class="card-meta">${a.cls === 'c1' ? 'MAT 151' : 'PSY 101'} · Due ${dt}</div>
+        </div>
+        <button class="btn-del" onclick="AcademicModule.remove('${a.id}')">✕</button>
+      </div>`;
+  },
+
+  render() {
+    const all     = this.state.assignments;
+    const dates   = all.map(a => new Date(a.due)).filter(d => !isNaN(d));
+    const minDate = dates.length ? new Date(Math.min(...dates)) : new Date();
+
+    const visible = all.filter(a => {
+      if (this.state.filter === 'c1') return a.cls === 'c1';
+      if (this.state.filter === 'c2') return a.cls === 'c2';
+      return true;
+    });
+
+    const pending = visible.filter(a => !a.done).sort((a,b) => new Date(a.due) - new Date(b.due));
+    const done    = visible.filter(a =>  a.done).sort((a,b) => new Date(a.due) - new Date(b.due));
+
+    const weekMap = new Map();
+    pending.forEach(a => {
+      const wk = this._weekNum(a.due, minDate);
+      if (!weekMap.has(wk)) weekMap.set(wk, []);
+      weekMap.get(wk).push(a);
+    });
+
+    const weekTotals = new Map();
+    all.forEach(a => {
+      const wk = this._weekNum(a.due, minDate);
+      if (!weekTotals.has(wk)) weekTotals.set(wk, { total: 0, done: 0 });
+      weekTotals.get(wk).total++;
+      if (a.done) weekTotals.get(wk).done++;
+    });
+
+    let html = `
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 02</span>
+          <h1 class="mod-title">Academic<br><em>Tracker</em></h1>
+        </div>
+      </header>
+      <div class="pill-row">
+        <button class="pill ${this.state.filter==='all'?'active':''}" onclick="AcademicModule.setFilter('all')">ALL</button>
+        <button class="pill ${this.state.filter==='c1'?'active':''}" onclick="AcademicModule.setFilter('c1')">MATH</button>
+        <button class="pill ${this.state.filter==='c2'?'active':''}" onclick="AcademicModule.setFilter('c2')">PSYCH</button>
+        <button class="pill p-amber" onclick="document.getElementById('ics-input').click()">+ IMPORT ICS</button>
+        <input type="file" id="ics-input" hidden onchange="AcademicModule.handleFile(this)">
+      </div>
+      <div class="list-area">`;
+
+    if (pending.length === 0 && done.length === 0) {
+      html += `<div class="empty-state">NO ASSIGNMENTS FOUND</div>`;
+    }
+
+    const sortedWeeks = [...weekMap.keys()].sort((a,b) => a - b);
+    sortedWeeks.forEach(wk => {
+      const items  = weekMap.get(wk);
+      const totals = weekTotals.get(wk) || { total: items.length, done: 0 };
+      const pct    = totals.total > 0 ? Math.round((totals.done / totals.total) * 100) : 0;
+      const barW   = Math.min(100, pct);
+      const barColor = pct === 100 ? 'background:var(--green)' : '';
+
+      html += `
+        <div class="week-header">
+          <div class="week-label">
+            <span>Week ${wk}</span>
+            <span style="color:var(--muted);font-size:9px">${totals.done}/${totals.total} done</span>
+          </div>
+          <div class="week-progress-row">
+            <div class="week-bar-track">
+              <div class="week-bar-fill" style="width:${barW}%;${barColor}"></div>
+            </div>
+            <span class="week-bar-label">${pct}%</span>
+          </div>
+        </div>`;
+
+      items.forEach(a => { html += this._card(a); });
+    });
+
+    if (done.length > 0) {
+      const isOpen = this.state.completedOpen;
+      html += `
+        <div class="completed-toggle" onclick="AcademicModule.toggleCompleted()">
+          <span class="completed-caret ${isOpen ? 'open' : ''}">▶</span>
+          COMPLETED (${done.length})
+          <button class="clear-btn" style="margin-left:auto" onclick="event.stopPropagation();AcademicModule.purgeCompleted()">PURGE</button>
+        </div>`;
+      if (isOpen) {
+        html += `<div class="completed-list">`;
+        done.forEach(a => { html += this._card(a); });
+        html += `</div>`;
+      }
+    }
+
+    html += `</div>`;
+    mount(html);
+  },
+
+  toggleCompleted() { this.state.completedOpen = !this.state.completedOpen; this.render(); },
+
+  purgeCompleted() {
+    if (!confirm('Remove all completed assignments?')) return;
+    this.state.assignments = this.state.assignments.filter(a => !a.done);
+    this.state.completedOpen = false;
+    this.save();
+    Shell.toast('COMPLETED TASKS PURGED');
+  },
+
+  setFilter(f) { this.state.filter = f; localStorage.setItem('truos-ac-filter', f); this.render(); },
+
+  toggle(id) {
+    const a = this.state.assignments.find(x => x.id === id);
+    if (a) a.done = !a.done;
+    this.save();
+  },
+
+  remove(id) {
+    this.state.assignments = this.state.assignments.filter(x => x.id !== id);
+    this.save();
+  },
+
+  handleFile(input) {
+    if (!input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = e => this.importICS(e.target.result);
+    reader.readAsText(input.files[0]);
+  },
+
+  bindEvents() {},
+  updateClock() {},
+  teardown() { document.querySelectorAll('#ac-panel, #ac-fab').forEach(el => el.remove()); }
+};
+
+/* ═══════════════════════════════════════════
+   MODULE 03 — TRADING TERMINAL v1
+═══════════════════════════════════════════ */
+const TradingModule = {
+
+  _prices:       {},   // { AAPL: { price, prevClose, fetchedAt } }
+  _refreshTimer: null,
+  _tradePanel:   null,
+  _tradeSide:    null, // 'buy' | 'sell'
+  _tradeTicker:  null,
+
+  /* ── Data helpers ── */
+  _loadPortfolio() {
+    const raw = TruDB.get('truos-trading-portfolio');
+    if (raw && typeof raw === 'object' && 'cash' in raw) return raw;
+    return { cash: 10000, positions: {}, trades: [] };
+  },
+
+  _savePortfolio(p) { TruDB.set('truos-trading-portfolio', p); },
+
+  _loadWatchlist() {
+    const raw = TruDB.get('truos-trading-watchlist');
+    return Array.isArray(raw) && raw.length ? raw : ['SPY','QQQ','AAPL','NVDA','TSLA'];
+  },
+
+  _saveWatchlist(w) { TruDB.set('truos-trading-watchlist', w); },
+
+  /* ── Market hours (US Eastern) ── */
+  _isMarketOpen() {
+    const et   = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day  = et.getDay();
+    if (day === 0 || day === 6) return false;
+    const hrs  = et.getHours() + et.getMinutes() / 60;
+    return hrs >= 9.5 && hrs < 16;
+  },
+
+  /* ── Price fetch ── */
+  async _fetchPrice(ticker) {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
+    const r   = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j    = await r.json();
+    const meta = j.chart.result[0].meta;
+    return { price: meta.regularMarketPrice, prevClose: meta.previousClose };
+  },
+
+  async _refreshPrices() {
+    const watchlist = this._loadWatchlist();
+    await Promise.allSettled(watchlist.map(async ticker => {
+      try {
+        const data = await this._fetchPrice(ticker);
+        this._prices[ticker] = { ...data, fetchedAt: Date.now() };
+      } catch {
+        // Keep last known price — stale stamp handled in render
+      }
+    }));
+    this._renderActive();
+  },
+
+  _ageStamp(fetchedAt) {
+    if (!fetchedAt) return 'NO DATA';
+    const mins = Math.floor((Date.now() - fetchedAt) / 60000);
+    if (mins < 1)  return 'LIVE';
+    if (mins < 60) return `${mins}m AGO`;
+    return `${Math.floor(mins/60)}h AGO`;
+  },
+
+  _fmtPrice(n) { return n != null ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; },
+  _fmtMoney(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+
+  /* ── Entry point ── */
+  init() {
+    this._initActive();
+  },
+
+  _initActive() {
+    this._renderActive();
+    // Kick off first price fetch
+    this._refreshPrices();
+    // 15s refresh during market hours
+    this._refreshTimer = setInterval(() => {
+      if (this._isMarketOpen()) this._refreshPrices();
+    }, 15000);
+  },
+
+  /* ── Locked screen ── */
+  renderLocked(count) {
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 03</span>
+          <h1 class="mod-title">Trading<br><em>Terminal</em></h1>
+        </div>
+      </header>
+      <div class="locked-wrap">
+        <div class="locked-icon">⚠️</div>
+        <div class="locked-title">TERMINAL RESTRICTED</div>
+        <div class="locked-sub">
+          ACADEMIC DEBT DETECTED<br>
+          <span style="color:var(--red);font-size:13px;font-weight:700">${count} OVERDUE TASK${count !== 1 ? 'S' : ''}</span><br><br>
+          PROTOCOL REQUIRES ZERO BACKLOG<br>
+          FOR TRADING ACCESS
+        </div>
+        <button class="pill p-amber" style="margin-top:24px;padding:12px 28px"
+                onclick="Shell.switchTo('academic')">
+          RESOLVE ACADEMIC LOGS →
+        </button>
+      </div>`);
+  },
+
+  /* ── Active terminal render ── */
+  _renderActive() {
+    const portfolio  = this._loadPortfolio();
+    const watchlist  = this._loadWatchlist();
+    const isOpen     = this._isMarketOpen();
+
+    // Calculate portfolio stats
+    let totalValue = portfolio.cash;
+    let totalPL    = 0;
+    let dayPL      = 0;
+
+    Object.entries(portfolio.positions).forEach(([ticker, pos]) => {
+      const pd    = this._prices[ticker];
+      const price = pd?.price ?? 0;
+      const prev  = pd?.prevClose ?? pos.avgCost;
+      totalValue += price * pos.shares;
+      totalPL    += (price - pos.avgCost) * pos.shares;
+      dayPL      += (price - prev) * pos.shares;
+    });
+
+    const plColor    = pl => pl >= 0 ? 'var(--green)' : 'var(--red)';
+    const marketBadge = isOpen
+      ? `<span class="market-badge open">● MARKET OPEN</span>`
+      : `<span class="market-badge closed">○ MARKET CLOSED</span>`;
+
+    /* Watchlist HTML */
+    const watchHTML = watchlist.map(ticker => {
+      const pd      = this._prices[ticker];
+      const price   = pd?.price;
+      const prev    = pd?.prevClose;
+      const chg     = price != null && prev ? ((price - prev) / prev) * 100 : null;
+      const chgCls  = chg == null ? 'neu' : chg >= 0 ? 'pos' : 'neg';
+      const chgStr  = chg != null ? `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%` : '—';
+      const age     = this._ageStamp(pd?.fetchedAt);
+
+      return `
+        <div class="ticker-card">
+          <div>
+            <div class="ticker-sym">${ticker}</div>
+            <div style="font-family:var(--mono);font-size:8px;color:var(--muted)">${age}</div>
+          </div>
+          <div>
+            <div class="ticker-price">$${this._fmtPrice(price)}</div>
+            <span class="ticker-chg ${chgCls}">${chgStr}</span>
+          </div>
+          <div class="ticker-actions">
+            <button class="trade-btn buy"  onclick="TradingModule.openPanel('${ticker}','buy')">BUY</button>
+            <button class="trade-btn sell" onclick="TradingModule.openPanel('${ticker}','sell')">SELL</button>
+            <button class="trade-btn del"  onclick="TradingModule.removeTicker('${ticker}')">✕</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    /* Positions HTML */
+    const posEntries = Object.entries(portfolio.positions).filter(([,p]) => p.shares > 0);
+    const posHTML = posEntries.length === 0
+      ? `<div style="font-family:var(--mono);font-size:10px;color:var(--muted);padding:10px 2px">NO POSITIONS</div>`
+      : posEntries.map(([ticker, pos]) => {
+          const pd      = this._prices[ticker];
+          const price   = pd?.price ?? pos.avgCost;
+          const val     = price * pos.shares;
+          const pl      = (price - pos.avgCost) * pos.shares;
+          const plPct   = ((price - pos.avgCost) / pos.avgCost) * 100;
+          return `
+            <div class="position-card">
+              <div>
+                <div class="pos-sym">${ticker}</div>
+                <div class="pos-shares">${pos.shares} sh @ $${this._fmtPrice(pos.avgCost)}</div>
+              </div>
+              <div class="pos-val">
+                <div>$${this._fmtMoney(val)}</div>
+                <div class="pos-pl ${pl >= 0 ? 'pos' : 'neg'}">
+                  ${pl >= 0 ? '+' : ''}$${this._fmtMoney(Math.abs(pl))} (${plPct >= 0 ? '+' : ''}${plPct.toFixed(2)}%)
+                </div>
+              </div>
+            </div>`;
+        }).join('');
+
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 03</span>
+          <h1 class="mod-title">Trading<br><em>Terminal</em></h1>
+        </div>
+        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          ${marketBadge}
+          <button onclick="TradingModule._refreshPrices()" style="background:transparent;border:1px solid var(--glass-border);border-radius:8px;color:var(--muted);font-family:var(--mono);font-size:9px;padding:3px 8px;cursor:pointer;letter-spacing:1px">↻ REFRESH</button>
+        </div>
+      </header>
+
+      <div class="stats-bar">
+        <div class="stat">
+          <span class="stat-val" style="color:${plColor(dayPL)}">${dayPL >= 0 ? '+' : ''}$${this._fmtMoney(Math.abs(dayPL))}</span>
+          <span class="stat-sub">Day P/L</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val" style="color:${plColor(totalPL)}">${totalPL >= 0 ? '+' : ''}$${this._fmtMoney(Math.abs(totalPL))}</span>
+          <span class="stat-sub">Total P/L</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val" style="color:var(--text)">$${Math.round(totalValue).toLocaleString('en-US')}</span>
+          <span class="stat-sub">Portfolio</span>
+        </div>
+      </div>
+
+      <div class="trade-wrap">
+
+        <!-- Cash -->
+        <div class="cash-row">
+          <span class="cash-label">AVAILABLE CASH</span>
+          <span class="cash-val">$${this._fmtMoney(portfolio.cash)}</span>
+        </div>
+
+        <!-- Watchlist -->
+        <div class="trade-section-label">
+          Watchlist
+          <button onclick="TradingModule.resetPortfolio()" style="background:transparent;border:1px solid rgba(255,71,87,0.3);color:var(--red);font-family:var(--mono);font-size:8px;padding:2px 8px;border-radius:4px;cursor:pointer;letter-spacing:1px">RESET</button>
+        </div>
+        <div class="add-ticker-row">
+          <input type="text" id="add-ticker-input" placeholder="ADD TICKER (e.g. MSFT)" maxlength="8">
+          <button onclick="TradingModule.addTicker()">+ ADD</button>
+        </div>
+        ${watchHTML || '<div class="empty-state" style="padding:20px">NO TICKERS</div>'}
+
+        <!-- Positions -->
+        <div class="trade-section-label">Positions</div>
+        ${posHTML}
+
+      </div>
+    `);
+  },
+
+  /* ── Add / Remove tickers ── */
+  addTicker() {
+    const input   = document.getElementById('add-ticker-input');
+    if (!input) return;
+    const ticker  = input.value.trim().toUpperCase().replace(/[^A-Z]/g, '');
+    if (!ticker)  return;
+    const list    = this._loadWatchlist();
+    if (list.includes(ticker)) { Shell.toast('ALREADY IN WATCHLIST', true); return; }
+    list.push(ticker);
+    this._saveWatchlist(list);
+    input.value = '';
+    this._refreshPrices();
+  },
+
+  removeTicker(ticker) {
+    const list = this._loadWatchlist().filter(t => t !== ticker);
+    this._saveWatchlist(list);
+    delete this._prices[ticker];
+    this._renderActive();
+  },
+
+  /* ── Trade panel ── */
+  openPanel(ticker, side) {
+    document.querySelectorAll('.slide-panel').forEach(el => el.remove());
+    this._tradeTicker = ticker;
+    this._tradeSide   = side;
+    const pd      = this._prices[ticker];
+    const price   = pd?.price;
+    const portfolio = this._loadPortfolio();
+    const pos     = portfolio.positions[ticker];
+    const maxShares = side === 'buy'
+      ? (price ? Math.floor(portfolio.cash / price) : 0)
+      : (pos?.shares || 0);
+    const sideLabel = side === 'buy' ? 'BUY' : 'SELL';
+
+    const panel = document.createElement('div');
+    panel.className = 'slide-panel';
+    panel.id = 'trade-panel';
+    panel.innerHTML = `
+      <div class="trade-panel-title">${sideLabel} ORDER</div>
+      <div class="trade-panel-ticker">${ticker}</div>
+      <div class="trade-panel-price">Market price: ${price != null ? '$' + this._fmtPrice(price) : 'PRICE UNAVAILABLE'}</div>
+      <input type="number" id="trade-qty" placeholder="Shares (max ${maxShares})" min="1" max="${maxShares}" step="1">
+      <div class="trade-panel-total" id="trade-total">Total: —</div>
+      <button class="btn-primary btn-${side}" onclick="TradingModule.executeTrade()">
+        CONFIRM ${sideLabel}
+      </button>
+      <button class="btn-cancel" onclick="TradingModule.closePanel()">CANCEL</button>
+    `;
+    document.body.appendChild(panel);
+
+    const qtyInput = panel.querySelector('#trade-qty');
+    qtyInput.addEventListener('input', () => {
+      const qty = parseInt(qtyInput.value) || 0;
+      const total = price != null ? (qty * price).toFixed(2) : '—';
+      const totalEl = document.getElementById('trade-total');
+      if (totalEl) totalEl.innerHTML = `Total: <strong>$${total}</strong>`;
+    });
+
+    requestAnimationFrame(() => panel.classList.add('open'));
+  },
+
+  closePanel() {
+    const panel = document.getElementById('trade-panel');
+    if (panel) { panel.classList.remove('open'); setTimeout(() => panel.remove(), 400); }
+  },
+
+  executeTrade() {
+    const qty     = parseInt(document.getElementById('trade-qty')?.value) || 0;
+    const ticker  = this._tradeTicker;
+    const side    = this._tradeSide;
+    const pd      = this._prices[ticker];
+    const price   = pd?.price;
+
+    if (!qty || qty <= 0) { Shell.toast('INVALID QUANTITY', true); return; }
+    if (price == null)    { Shell.toast('NO PRICE DATA — REFRESH', true); return; }
+
+    const portfolio = this._loadPortfolio();
+    const cost      = qty * price;
+
+    if (side === 'buy') {
+      if (cost > portfolio.cash) { Shell.toast('INSUFFICIENT FUNDS', true); return; }
+      portfolio.cash -= cost;
+      if (!portfolio.positions[ticker]) portfolio.positions[ticker] = { shares: 0, avgCost: 0 };
+      const pos = portfolio.positions[ticker];
+      const newShares = pos.shares + qty;
+      pos.avgCost = (pos.shares * pos.avgCost + cost) / newShares;
+      pos.shares  = newShares;
+      Shell.toast(`BOUGHT ${qty} ${ticker} @ $${this._fmtPrice(price)}`);
+    } else {
+      const pos = portfolio.positions[ticker];
+      if (!pos || pos.shares < qty) { Shell.toast('INSUFFICIENT SHARES', true); return; }
+      pos.shares -= qty;
+      portfolio.cash += qty * price;
+      if (pos.shares === 0) delete portfolio.positions[ticker];
+      Shell.toast(`SOLD ${qty} ${ticker} @ $${this._fmtPrice(price)}`);
+    }
+
+    portfolio.trades.push({ ticker, action: side, shares: qty, price, ts: Date.now() });
+    this._savePortfolio(portfolio);
+    this.closePanel();
+    setTimeout(() => this._renderActive(), 420);
+  },
+
+  resetPortfolio() {
+    if (!confirm('Reset paper portfolio? All positions and trade history will be cleared. This cannot be undone.')) return;
+    this._savePortfolio({ cash: 10000, positions: {}, trades: [] });
+    Shell.toast('PORTFOLIO RESET — $10,000 RESTORED');
+    this._renderActive();
+  },
+
+  updateClock() {},
+
+  teardown() {
+    if (this._refreshTimer) { clearInterval(this._refreshTimer); this._refreshTimer = null; }
+    document.querySelectorAll('#trade-panel').forEach(el => el.remove());
+  }
+};
+
+/* ═══════════════════════════════════════════
+   MODULE 04 — SPENDING TRACKER
+═══════════════════════════════════════════ */
+const SpendingTrackerModule = {
+  CATEGORIES: [
+    { id: 'food', label: 'Food', icon: '🍔' },
+    { id: 'transport', label: 'Transport', icon: '🚗' },
+    { id: 'utility', label: 'Utilities', icon: '💡' },
+    { id: 'entertainment', label: 'Entertainment', icon: '🎬' },
+    { id: 'shopping', label: 'Shopping', icon: '🛍' },
+    { id: 'health', label: 'Health', icon: '💊' },
+    { id: 'other', label: 'Other', icon: '📌' }
+  ],
+
+  state: { transactions: [], filter: 'all', period: 'month' },
+  _handler: null,
+
+  init() {
+    try {
+      const raw = TruDB.get('truos-spending-txs');
+      this.state.transactions = Array.isArray(raw) ? raw : [];
+    } catch {
+      this.state.transactions = [];
+    }
+    this.state.filter = localStorage.getItem('truos-spend-filter') || 'all';
+    this.state.period = localStorage.getItem('truos-spend-period') || 'month';
+    this.render();
+    this.bindEvents();
+  },
+
+  save() {
+    TruDB.set('truos-spending-txs', this.state.transactions);
+  },
+
+  addTransaction(category, amount, description, date) {
+    if (!category || !amount || amount <= 0) return false;
+    const tx = {
+      id: 'tx-' + Math.random().toString(36).substr(2, 9),
+      category,
+      amount: parseFloat(amount),
+      description: description || this._getCategoryLabel(category),
+      date: date || new Date().toISOString().split('T')[0],
+      timestamp: Date.now()
+    };
+    this.state.transactions.push(tx);
+    this.save();
+    return true;
+  },
+
+  deleteTransaction(id) {
+    this.state.transactions = this.state.transactions.filter(t => t.id !== id);
+    this.save();
+  },
+
+  _getCategoryLabel(id) {
+    const cat = this.CATEGORIES.find(c => c.id === id);
+    return cat ? cat.label : 'Other';
+  },
+
+  _getCategoryIcon(id) {
+    const cat = this.CATEGORIES.find(c => c.id === id);
+    return cat ? cat.icon : '📌';
+  },
+
+  _getDateRange() {
+    const now = new Date();
+    if (this.state.period === 'week') {
+      const start = new Date(now);
+      start.setDate(now.getDate() - now.getDay());
+      return { start, end: now };
+    }
+    if (this.state.period === 'month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { start, end: now };
+    }
+    if (this.state.period === 'year') {
+      const start = new Date(now.getFullYear(), 0, 1);
+      return { start, end: now };
+    }
+    return { start: new Date(0), end: now };
+  },
+
+  _filterTransactions() {
+    const range = this._getDateRange();
+    let filtered = this.state.transactions.filter(t => {
+      const txDate = new Date(t.date);
+      return txDate >= range.start && txDate <= range.end;
+    });
+
+    if (this.state.filter !== 'all') {
+      filtered = filtered.filter(t => t.category === this.state.filter);
+    }
+
+    return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+  },
+
+  _calculateStats() {
+    const txs = this._filterTransactions();
+    const stats = {
+      total: 0,
+      byCategory: {},
+      daily: {}
+    };
+
+    this.CATEGORIES.forEach(cat => {
+      stats.byCategory[cat.id] = 0;
+    });
+
+    txs.forEach(tx => {
+      stats.total += tx.amount;
+      stats.byCategory[tx.category] = (stats.byCategory[tx.category] || 0) + tx.amount;
+      
+      const day = new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      stats.daily[day] = (stats.daily[day] || 0) + tx.amount;
+    });
+
+    return stats;
+  },
+
+  render() {
+    const txs = this._filterTransactions();
+    const stats = this._calculateStats();
+
+    const categoryTotals = Object.entries(stats.byCategory)
+      .filter(([,amt]) => amt > 0)
+      .sort((a, b) => b[1] - a[1]);
+
+    const maxCatAmount = categoryTotals.length ? categoryTotals[0][1] : 1;
+
+    // Category breakdown bars
+    const catBarsHTML = categoryTotals.map(([catId, amount]) => {
+      const pct = (amount / maxCatAmount) * 100;
+      const cat = this.CATEGORIES.find(c => c.id === catId);
+      return `
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px">
+            <span style="color:var(--text);font-weight:600">${cat.icon} ${cat.label}</span>
+            <span style="font-family:var(--mono);font-weight:700;color:var(--text)">$${amount.toFixed(2)}</span>
+          </div>
+          <div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden">
+            <div style="height:100%;background:linear-gradient(90deg,var(--amber),var(--red));width:${pct}%"></div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const filterBtns = [
+      { id: 'all', label: 'All' },
+      ...this.CATEGORIES.map(c => ({ id: c.id, label: c.label }))
+    ];
+
+    const filterHTML = filterBtns.map(f => `
+      <button class="spend-filter-btn${this.state.filter === f.id ? ' active' : ''}" 
+              data-action="filter" data-cat="${f.id}">
+        ${f.label}
+      </button>`).join('');
+
+    const periodHTML = ['week', 'month', 'year', 'all'].map(p => `
+      <button class="pill${this.state.period === p ? ' active' : ''}" 
+              data-action="period" data-period="${p}">
+        ${p.toUpperCase()}
+      </button>`).join('');
+
+    const txHTML = txs.length === 0
+      ? `<div class="spend-empty">NO TRANSACTIONS</div>`
+      : txs.map(tx => {
+          const cat = this.CATEGORIES.find(c => c.id === tx.category);
+          const catClass = `cat-${tx.category}`;
+          const dateStr = new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          return `
+            <div class="spend-tx">
+              <div class="spend-tx-icon" style="background:rgba(255,255,255,0.06)">${cat.icon}</div>
+              <div class="spend-tx-body">
+                <div class="spend-tx-name">${esc(tx.description)}</div>
+                <div class="spend-tx-meta">
+                  <span class="spend-category-badge cat-${tx.category}">${cat.label}</span>
+                  ${dateStr}
+                </div>
+              </div>
+              <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                <div class="spend-tx-amount">−$${tx.amount.toFixed(2)}</div>
+                <button class="spend-tx-delete" data-action="delete" data-id="${tx.id}">✕</button>
+              </div>
+            </div>`;
+        }).join('');
+
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 04</span>
+          <h1 class="mod-title">Spending<br><em>Tracker</em></h1>
+        </div>
+      </header>
+
+      <div class="spend-wrap">
+        
+        <div class="spend-summary">
+          <div class="spend-card">
+            <span class="spend-card-amount" style="color:var(--red)">$${stats.total.toFixed(2)}</span>
+            <span class="spend-card-label">Spent</span>
+          </div>
+          <div class="spend-card">
+            <span class="spend-card-amount" style="color:var(--green)">${txs.length}</span>
+            <span class="spend-card-label">Transactions</span>
+          </div>
+        </div>
+
+        <div style="padding:0 18px 12px">
+          <div class="sys-label" style="margin-bottom:8px">Period</div>
+          <div class="pill-row" style="padding:0">${periodHTML}</div>
+        </div>
+
+        ${categoryTotals.length > 0 ? `
+        <div class="spend-chart">
+          <div class="spend-chart-title">Breakdown</div>
+          ${catBarsHTML}
+        </div>
+        ` : ''}
+
+        <div style="padding:0 18px 8px">
+          <div class="sys-label">Filter by category</div>
+        </div>
+        <div class="spend-filters">${filterHTML}</div>
+
+        <div class="spend-list">
+          <div class="section-head">Transactions (${txs.length})</div>
+          ${txHTML}
+        </div>
+
+      </div>
+    `);
+
+    this.updateClock();
+  },
+
+  updateClock() {},
+
+  bindEvents() {
+    const wrap = document.getElementById('main-content');
+    if (!wrap || wrap._spendBound) return;
+    wrap._spendBound = true;
+
+    this._handler = e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+
+      const { action, cat, id, period } = btn.dataset;
+
+      if (action === 'filter') {
+        this.state.filter = cat;
+        localStorage.setItem('truos-spend-filter', cat);
+        this.render();
+        return;
+      }
+
+      if (action === 'period') {
+        this.state.period = period;
+        localStorage.setItem('truos-spend-period', period);
+        this.render();
+        return;
+      }
+
+      if (action === 'delete') {
+        this.deleteTransaction(id);
+        Shell.toast('TRANSACTION DELETED');
+        this.render();
+        return;
+      }
+    };
+
+    wrap.addEventListener('click', this._handler);
+    this.openPanel();
+  },
+
+  openPanel() {
+    const panel = document.createElement('div');
+    panel.className = 'slide-panel';
+    panel.id = 'spend-panel';
+    panel.innerHTML = `
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:12px">
+        Add Transaction
+      </div>
+      <select id="spend-category" style="margin-bottom:10px">
+        <option value="">Select category...</option>
+        ${this.CATEGORIES.map(c => `<option value="${c.id}">${c.icon} ${c.label}</option>`).join('')}
+      </select>
+      <input type="number" id="spend-amount" placeholder="Amount ($)" min="0.01" step="0.01" style="margin-bottom:10px">
+      <input type="text" id="spend-desc" placeholder="Description (optional)" style="margin-bottom:10px">
+      <input type="date" id="spend-date" style="margin-bottom:16px">
+      <button class="btn-primary" style="background:var(--green);color:#000;margin-bottom:8px" onclick="SpendingTrackerModule.handleAddTransaction()">
+        ADD TRANSACTION
+      </button>
+      <button class="btn-cancel" onclick="SpendingTrackerModule.closePanel()">CLOSE</button>
+    `;
+    document.body.appendChild(panel);
+
+    // Set date input to today
+    const dateInput = panel.querySelector('#spend-date');
+    if (dateInput) {
+      dateInput.valueAsDate = new Date();
+    }
+
+    setTimeout(() => panel.classList.add('open'), 50);
+  },
+
+  handleAddTransaction() {
+    const category = document.getElementById('spend-category')?.value;
+    const amount = parseFloat(document.getElementById('spend-amount')?.value || 0);
+    const description = document.getElementById('spend-desc')?.value || '';
+    const date = document.getElementById('spend-date')?.value;
+
+    if (!category || !amount || amount <= 0) {
+      Shell.toast('INVALID INPUT', true);
+      return;
+    }
+
+    if (this.addTransaction(category, amount, description, date)) {
+      Shell.toast(`ADDED $${amount.toFixed(2)} · ${this._getCategoryLabel(category)}`);
+      this.render();
+    } else {
+      Shell.toast('ERROR ADDING TRANSACTION', true);
+    }
+  },
+
+  closePanel() {
+    const panel = document.getElementById('spend-panel');
+    if (panel) { 
+      panel.classList.remove('open'); 
+      setTimeout(() => panel.remove(), 400); 
+    }
+  },
+
+  teardown() {
+    const wrap = document.getElementById('main-content');
+    if (wrap) {
+      wrap._spendBound = false;
+      if (this._handler) wrap.removeEventListener('click', this._handler);
+      this._handler = null;
+    }
+    document.querySelectorAll('#spend-panel').forEach(el => el.remove());
+  }
+};
+
+/* ═══════════════════════════════════════════
+   MODULE 00 — GLOBAL DASHBOARD
+═══════════════════════════════════════════ */
+const DashboardModule = {
+  _refreshInterval: null,
+
+  _incomeStats() {
+    const CFG = IncomeModule.CFG;
+    try {
+      const weeks = TruDB.get('truos_schedule_v34');
+      if (!Array.isArray(weeks) || weeks.length !== 2) return { net: 0, hrs: 0, pct: 0, gap: CFG.target, target: CFG.target };
+      const calcs = weeks.map(w => IncomeModule.calcWeek(w));
+      const gross = calcs[0].totalGross + calcs[1].totalGross;
+      const net   = IncomeModule.toNet(gross);
+      const hrs   = calcs[0].totalHrs   + calcs[1].totalHrs;
+      const pct   = Math.min(100, (net / CFG.target) * 100);
+      const gap   = Math.max(0, CFG.target - net);
+      return { net, hrs, pct, gap, target: CFG.target };
+    } catch { return { net: 0, hrs: 0, pct: 0, gap: CFG.target, target: CFG.target }; }
+  },
+
+  _academicStats() {
+    try {
+      const data = TruDB.get('truos-academic') || [];
+      const now  = new Date();
+      const in72 = new Date(now.getTime() + 72 * MS_PER_HOUR);
+      const overdue  = data.filter(a => !a.done && new Date(a.due) < now);
+      const urgent   = data.filter(a => !a.done && new Date(a.due) >= now && new Date(a.due) <= in72);
+      const done     = data.filter(a => a.done).length;
+      const total    = data.length;
+      const upcoming = data.filter(a => !a.done && new Date(a.due) >= now).sort((a,b) => new Date(a.due) - new Date(b.due));
+      return { overdue: overdue.length, urgent: urgent.length, done, total, next: upcoming[0] || null };
+    } catch { return { overdue: 0, urgent: 0, done: 0, total: 0, next: null }; }
+  },
+
+  _statusLine(income, academic) {
+    const incomeGood   = income.pct  >= 100;
+    const academicGood = academic.overdue === 0;
+    if (incomeGood && academicGood)
+      return { text: 'ALL SYSTEMS NOMINAL', color: 'var(--green)' };
+    if (!academicGood && income.gap > 500)
+      return { text: `DEBT ON TWO FRONTS · ${academic.overdue} OVERDUE · $${Math.round(income.gap)} GAP`, color: 'var(--red)' };
+    if (!academicGood)
+      return { text: `ACADEMIC DEBT DETECTED · ${academic.overdue} OVERDUE TASK${academic.overdue !== 1 ? 'S' : ''}`, color: 'var(--red)' };
+    if (academic.total - academic.done > 5)
+      return { text: 'WARNING: HIGH ACADEMIC LOAD', color: 'var(--amber)' };
+    if (income.gap > 0)
+      return { text: `$${Math.round(income.gap)} TO TARGET · SCHEDULE MORE SHIFTS`, color: 'var(--amber)' };
+    return { text: 'INCOME SECURED · STAY ON TOP OF ACADEMIC LOAD', color: 'var(--blue)' };
+  },
+
+  _shiftFlex(income) {
+    const CFG = IncomeModule.CFG;
+    // Approximate net value of one 12H midnight shift (no OT assumed)
+    const grossPerShift = (CFG.baseRate + CFG.diffs.midnight) * 12;
+    const netPerShift   = IncomeModule.toNet(grossPerShift);
+    const buffer        = income.net - income.target;
+    if (buffer >= netPerShift) {
+      const canMiss = Math.floor(buffer / netPerShift);
+      return { ok: true, safe: true, msg: `$${Math.round(buffer)} BUFFER · CAN MISS ${canMiss} SHIFT${canMiss !== 1 ? 'S' : ''}` };
+    } else if (buffer >= 0) {
+      return { ok: true, safe: false, msg: `ON TARGET · DON'T SKIP A SHIFT` };
+    } else {
+      const needed = Math.ceil(Math.abs(buffer) / netPerShift);
+      return { ok: false, safe: false, msg: `NEED ~${needed} MORE SHIFT${needed !== 1 ? 'S' : ''} TO HIT $${income.target}` };
+    }
+  },
+
+  init() {
+    this._render();
+    // 30s auto-refresh — keeps badges live without manual switching
+    this._refreshInterval = setInterval(() => this._render(), 30000);
+  },
+
+  _render() {
+    const income   = this._incomeStats();
+    const academic = this._academicStats();
+    const status   = this._statusLine(income, academic);
+    const flex     = this._shiftFlex(income);
+
+    const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+    const barColor  = income.pct >= 100 ? 'var(--green)' : income.pct >= 60 ? 'var(--amber)' : 'var(--red)';
+    const flexColor = flex.safe ? 'var(--green)' : flex.ok ? 'var(--amber)' : 'var(--red)';
+
+    const acBadge = academic.overdue > 0
+      ? `<span class="dash-card-badge badge-warn">${academic.overdue} OVERDUE</span>`
+      : academic.urgent > 0
+        ? `<span class="dash-card-badge badge-warn" style="background:rgba(245,166,35,0.15);border-color:rgba(245,166,35,0.4);color:var(--amber)">${academic.urgent} DUE SOON</span>`
+        : `<span class="dash-card-badge badge-ok">CLEAR</span>`;
+
+    const nextDueHTML = academic.next
+      ? `<div class="dash-next-due">NEXT DUE → <strong>${esc(academic.next.title)}</strong> · ${new Date(academic.next.due).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>`
+      : academic.total === 0
+        ? `<div class="dash-next-due">NO TASKS LOGGED</div>`
+        : `<div class="dash-next-due" style="color:var(--green)">NO UPCOMING TASKS</div>`;
+
+    const tradeBadge = `<span class="dash-card-badge badge-clear">ACTIVE</span>`;
+    const tradeColor = 'var(--green)';
+    const tradeText  = academic.overdue > 0
+      ? `${academic.overdue} overdue task${academic.overdue !== 1 ? 's' : ''} — clear your backlog`
+      : 'Terminal active — paper portfolio running';
+
+    const c = nowClock();
+
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Dashboard</span>
+          <h1 class="mod-title">System<br><em>Overview</em></h1>
+        </div>
+        <div style="text-align:right">
+          <div class="sys-label" id="dash-date">${c.date}</div>
+          <div style="font-family:var(--mono);font-size:18px;font-weight:700;" id="dash-time">${c.time}</div>
+        </div>
+      </header>
+
+      <div class="dash-wrap">
+
+        <div class="dash-status">
+          <div class="sys-label" style="text-align:center;margin-bottom:6px">System Status</div>
+          <div class="dash-status-line" style="color:${status.color}">${status.text}</div>
+        </div>
+
+        <div class="dash-card" onclick="Shell.switchTo('income')">
+          <div class="dash-card-top">
+            <span class="dash-card-label">Income · Biweekly</span>
+            ${income.pct >= 100
+              ? `<span class="dash-card-badge badge-ok">GOAL MET</span>`
+              : `<span class="dash-card-badge badge-warn">$${fmt(income.gap)} GAP</span>`}
+          </div>
+          <div class="dash-val" style="color:${barColor}">$${fmt(income.net)}</div>
+          <div class="dash-sub">of $${fmt(income.target)} target · ${income.hrs}H scheduled</div>
+          <div class="dash-bar">
+            <div class="dash-bar-fill" style="width:${income.pct}%;background:${barColor}"></div>
+          </div>
+          <div class="dash-sub">${income.pct.toFixed(1)}% complete</div>
+          <div class="dash-sub" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-border);color:${flexColor};font-weight:700">
+            ${flex.safe ? '✓' : flex.ok ? '—' : '↑'} ${flex.msg}
+          </div>
+          <div class="dash-tap-hint">TAP TO EDIT SCHEDULE →</div>
+        </div>
+
+        <div class="dash-card" onclick="Shell.switchTo('academic')">
+          <div class="dash-card-top">
+            <span class="dash-card-label">Academic · Tasks</span>
+            ${acBadge}
+          </div>
+          <div style="display:flex;gap:16px;align-items:flex-end">
+            <div>
+              <div class="dash-val" style="color:${academic.overdue > 0 ? 'var(--red)' : 'var(--green)'}">
+                ${academic.overdue}
+              </div>
+              <div class="dash-sub">overdue</div>
+            </div>
+            <div style="padding-bottom:2px">
+              <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--muted)">${academic.done}/${academic.total}</div>
+              <div class="dash-sub">completed</div>
+            </div>
+          </div>
+          ${nextDueHTML}
+          <div class="dash-tap-hint">TAP TO VIEW TASKS →</div>
+        </div>
+
+        <div class="dash-card" onclick="Shell.switchTo('trading')">
+          <div class="dash-card-top">
+            <span class="dash-card-label">Trading · Terminal</span>
+            ${tradeBadge}
+          </div>
+          <div class="dash-val" style="color:${tradeColor};font-size:20px;margin-bottom:6px">
+            ● OPERATIONAL
+          </div>
+          <div class="dash-sub">${tradeText}</div>
+          <div class="dash-tap-hint">TAP TO OPEN TERMINAL →</div>
+        </div>
+
+      </div>
+    `);
+  },
+
+  updateClock() {
+    const c  = nowClock();
+    const te = document.getElementById('dash-time');
+    const de = document.getElementById('dash-date');
+    if (te) te.textContent = c.time;
+    if (de) de.textContent = c.date;
+  },
+
+  teardown() {
+    if (this._refreshInterval) { clearInterval(this._refreshInterval); this._refreshInterval = null; }
+  }
+};
+
+/* ═══════════════════════════════════════════
+   MODULE 04 — STUDY PLANNER
+═══════════════════════════════════════════ */
+const StudyPlannerModule = {
+
+  _DAY_NAMES: ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+
+  _getWeekDays() {
+    const now = new Date();
+    const dow = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+    monday.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d;
+    });
+  },
+
+  _shiftsForDayName(dayName, weeks) {
+    const out = [];
+    weeks.forEach((week, wi) => {
+      const s = week[dayName];
+      if (s && s.type !== 'off') out.push({ week: wi + 1, ...s });
+    });
+    return out;
+  },
+
+  _hasShiftOnDayName(dayName, weeks) {
+    return weeks.some(w => w[dayName] && w[dayName].type !== 'off');
+  },
+
+  _assignmentsOnDate(date, assignments) {
+    const y = date.getFullYear(), m = date.getMonth(), d = date.getDate();
+    return assignments.filter(a => {
+      if (a.done) return false;
+      const due = new Date(a.due);
+      return due.getFullYear() === y && due.getMonth() === m && due.getDate() === d;
+    });
+  },
+
+  init() {
+    let assignments = [], weeks = [];
+    try {
+      const raw = TruDB.get('truos-academic');
+      assignments = Array.isArray(raw) ? raw : [];
+    } catch {}
+    try {
+      const raw = TruDB.get('truos_schedule_v34');
+      weeks = Array.isArray(raw) && raw.length === 2 ? raw : IncomeModule.emptyWeeks();
+    } catch { weeks = IncomeModule.emptyWeeks(); }
+
+    this._render(assignments, weeks);
+  },
+
+  _render(assignments, weeks) {
+    const weekDays = this._getWeekDays();
+    const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+
+    let totalConflicts = 0;
+
+    const daysHTML = weekDays.map(date => {
+      const dayName = this._DAY_NAMES[date.getDay()];
+      const isPast  = date < todayMid;
+      const isToday = date.getTime() === todayMid.getTime();
+
+      const shifts = this._shiftsForDayName(dayName, weeks);
+
+      // Assignments due on this date
+      const dueToday = this._assignmentsOnDate(date, assignments);
+
+      // Conflict A: has shift today + assignment due TOMORROW
+      const tomorrow = new Date(date);
+      tomorrow.setDate(date.getDate() + 1);
+      const dueTomorrow = this._assignmentsOnDate(tomorrow, assignments);
+      const conflictA = shifts.length > 0 && dueTomorrow.length > 0;
+
+      // Conflict B: assignment due today + worked YESTERDAY
+      const yesterday = new Date(date);
+      yesterday.setDate(date.getDate() - 1);
+      const yDayName = this._DAY_NAMES[yesterday.getDay()];
+      const workedYesterday = this._hasShiftOnDayName(yDayName, weeks);
+      const conflictB = dueToday.length > 0 && workedYesterday;
+
+      if (conflictA || conflictB) totalConflicts++;
+
+      const dateLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const dayShort  = dayName.slice(0, 3).toUpperCase();
+
+      const shiftsHTML = shifts.length > 0
+        ? `<div class="plan-shifts">${shifts.map(s =>
+            `<span class="plan-shift-tag">${s.hrs}H ${s.type.toUpperCase()} · WK${s.week}</span>`
+          ).join('')}</div>`
+        : '';
+
+      const assignHTML = dueToday.map(a => {
+        const u = AcademicModule.urgency(a.due, a.done);
+        const title = esc(a.title.length > 30 ? a.title.slice(0, 29) + '…' : a.title);
+        return `<div class="plan-assign ${u}">${title}<span class="plan-class">${a.cls === 'c1' ? 'MATH' : 'PSYCH'}</span></div>`;
+      }).join('');
+
+      let conflictHTML = '';
+      if (conflictA) {
+        conflictHTML = `<div class="plan-conflict">⚠ SHIFT TODAY · ASSIGNMENT DUE TOMORROW</div>`;
+      } else if (conflictB) {
+        conflictHTML = `<div class="plan-conflict">⚠ WORKED LAST SHIFT · ASSIGNMENT DUE TODAY</div>`;
+      }
+
+      const isEmpty = shifts.length === 0 && dueToday.length === 0 && !conflictA && !conflictB;
+
+      return `
+        <div class="plan-day${isToday ? ' plan-today' : ''}${isPast ? ' plan-past' : ''}">
+          <div class="plan-day-header">
+            <div class="plan-day-name">${dayShort}</div>
+            <div class="plan-day-date">${dateLabel}${isToday ? ' · TODAY' : ''}</div>
+          </div>
+          <div class="plan-day-body">
+            ${shiftsHTML}${assignHTML}${conflictHTML}
+            ${isEmpty ? '<div class="plan-clear">No shifts or deadlines</div>' : ''}
+          </div>
+        </div>`;
+    }).join('');
+
+    const weekStart = weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const weekEnd   = weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    const summaryHTML = totalConflicts > 0
+      ? `<div class="plan-conflict-summary">⚠ ${totalConflicts} CONFLICT${totalConflicts !== 1 ? 'S' : ''} THIS WEEK — PLAN AHEAD</div>`
+      : `<div class="plan-ok-summary">✓ NO CONFLICTS THIS WEEK</div>`;
+
+    mount(`
+      <header class="mod-header">
+        <div>
+          <span class="sys-label">TruOS · Module 04</span>
+          <h1 class="mod-title">Study<br><em>Planner</em></h1>
+        </div>
+        <div style="text-align:right">
+          <div class="sys-label">${weekStart} – ${weekEnd}</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px">WK1/WK2 = pay period</div>
+        </div>
+      </header>
+
+      <div class="plan-wrap">
+        <div class="plan-legend">
+          <span class="plan-legend-item"><span class="plan-legend-dot" style="background:rgba(245,166,35,0.6)"></span>Shift</span>
+          <span class="plan-legend-item"><span class="plan-legend-dot" style="background:rgba(30,144,255,0.6)"></span>Due</span>
+          <span class="plan-legend-item"><span class="plan-legend-dot" style="background:rgba(255,71,87,0.6)"></span>Conflict</span>
+        </div>
+        ${summaryHTML}
+        ${daysHTML}
+      </div>
+    `);
+  },
+
+  bindEvents() {},
+  updateClock() {},
+  teardown() {}
+};
+
+/* ═══════════════════════════════════════════
+   AMBIENT ALERTS — In-app urgency indicators
+═══════════════════════════════════════════ */
+const AmbientAlerts = {
+
+  check() {
+    // Remove any existing dots
+    document.querySelectorAll('.alert-dot').forEach(d => d.remove());
+    try {
+      const data   = TruDB.get('truos-academic') || [];
+      const now    = new Date();
+      const in24   = new Date(now.getTime() + 24 * MS_PER_HOUR);
+      const overdue = data.filter(a => !a.done && new Date(a.due) < now).length;
+      const urgent  = data.filter(a => !a.done && new Date(a.due) >= now && new Date(a.due) <= in24).length;
+
+      if (overdue === 0 && urgent === 0) return;
+
+      const acTab = document.querySelector('[data-mod="academic"]');
+      if (!acTab) return;
+
+      const color  = overdue > 0 ? 'var(--red)' : 'var(--amber)';
+      const dot    = document.createElement('div');
+      dot.className = 'alert-dot urgent-pulse';
+      dot.style.background = color;
+      acTab.appendChild(dot);
+    } catch {}
+  }
+};
+
+/* ═══════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════ */
+Shell.modules = { dashboard: DashboardModule, income: IncomeModule, academic: AcademicModule, trading: TradingModule, spending: SpendingTrackerModule, planner: StudyPlannerModule };
+TruDB.init().then(() => {
+  Shell.init();
+  // Check for urgent alerts after first render
+  setTimeout(() => AmbientAlerts.check(), 500);
+});
+</script>
+</body>
+</html>
