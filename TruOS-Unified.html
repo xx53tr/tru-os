@@ -70,7 +70,7 @@ body::before {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-top: 1px solid var(--glass-border);
-  display: grid; grid-template-columns: repeat(4,1fr);
+  display: grid; grid-template-columns: repeat(5,1fr);
   padding: 10px 0 max(16px, env(safe-area-inset-bottom));
   z-index: 900;
 }
@@ -243,6 +243,161 @@ select option { background: #141416; }
 .purge-row { padding: 8px 4px 4px; display: flex; justify-content: flex-end; }
 
 /* ═══════════════════════════════════════════
+   FINANCE MODULE — v2.0 DUAL-ACCOUNT FORENSIC
+═══════════════════════════════════════════ */
+.fin-wrap { padding: 0 18px 100px; }
+
+/* Period / Account selectors */
+.fin-period-row {
+  display: flex; gap: 8px; align-items: center;
+  margin-bottom: 10px; overflow-x: auto; scrollbar-width: none;
+}
+.fin-period-row::-webkit-scrollbar { display: none; }
+
+/* Phase 1 — Account balance strips */
+.fin-acct-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.fin-acct-card {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 18px; padding: 14px 16px;
+}
+.fin-acct-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+}
+.fin-acct-name {
+  font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
+}
+.fin-acct-edit {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  background: transparent; border: 1px solid var(--glass-border);
+  border-radius: 6px; padding: 2px 8px; cursor: pointer;
+}
+.fin-acct-row {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 6px;
+}
+.fin-acct-stat { text-align: center; }
+.fin-acct-val {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  display: block; line-height: 1.2;
+}
+.fin-acct-sub {
+  font-family: var(--mono); font-size: 7px; text-transform: uppercase;
+  color: var(--muted); letter-spacing: 0.5px; margin-top: 2px;
+}
+.fin-netting-pill {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(30,144,255,0.08); border: 1px solid rgba(30,144,255,0.25);
+  border-radius: 10px; padding: 8px 12px; margin-bottom: 14px;
+  font-family: var(--mono); font-size: 9px; color: rgba(30,144,255,0.9);
+}
+
+/* Phase 2 — Unified category table */
+.fin-cats { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.fin-cat-row { display: flex; flex-direction: column; gap: 4px; }
+.fin-cat-top { display: flex; align-items: center; gap: 10px; }
+.fin-cat-name {
+  font-family: var(--mono); font-size: 9px; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted); width: 90px; flex-shrink: 0;
+}
+.fin-cat-dual-bar { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.fin-cat-bar-track {
+  height: 5px; background: var(--glass);
+  border-radius: 4px; overflow: hidden; border: 1px solid var(--glass-border);
+}
+.fin-cat-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(0.16,1,0.3,1); }
+.fin-cat-amt {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  width: 54px; text-align: right; flex-shrink: 0;
+}
+
+/* Phase 3 — Audit flags */
+.fin-phase-head {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 3px;
+  text-transform: uppercase; color: var(--muted); padding: 14px 0 8px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.fin-phase-head span { color: var(--amber); }
+.fin-flags { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+.fin-flag {
+  border-radius: 12px; padding: 11px 14px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.5px;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.fin-flag.flag-red    { background: rgba(255,71,87,0.10);  border: 1px solid rgba(255,71,87,0.3); }
+.fin-flag.flag-amber  { background: rgba(245,166,35,0.10); border: 1px solid rgba(245,166,35,0.3); }
+.fin-flag.flag-blue   { background: rgba(30,144,255,0.10); border: 1px solid rgba(30,144,255,0.3); }
+.fin-flag.flag-green  { background: rgba(46,213,115,0.10); border: 1px solid rgba(46,213,115,0.3); }
+.fin-flag-icon { font-size: 14px; flex-shrink: 0; line-height: 1.3; }
+.fin-flag-body { flex: 1; min-width: 0; }
+.fin-flag-title { font-weight: 700; margin-bottom: 2px; }
+.fin-flag-detail { color: var(--muted); font-size: 9px; line-height: 1.5; }
+.fin-flag-dismiss {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 14px; cursor: pointer; padding: 0 0 0 4px; flex-shrink: 0;
+  opacity: 0.5; transition: 0.2s;
+}
+.fin-flag-dismiss:active { opacity: 1; color: var(--red); }
+
+/* Phase 4 — Sticky summary bar */
+.fin-p4-sticky {
+  position: fixed; bottom: 72px; left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 32px); max-width: 448px;
+  background: rgba(8,9,10,0.94); backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border); border-radius: 20px;
+  padding: 12px 16px; z-index: 700;
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 8px;
+}
+.fin-p4-metric { text-align: center; }
+.fin-p4-val {
+  font-family: var(--mono); font-size: 16px; font-weight: 700;
+  display: block; line-height: 1.1;
+}
+.fin-p4-sub {
+  font-family: var(--mono); font-size: 7px; text-transform: uppercase;
+  color: var(--muted); letter-spacing: 0.5px; margin-top: 3px;
+}
+
+/* 3-month compare */
+.fin-compare-bars { display: flex; align-items: flex-end; gap: 10px; height: 72px; margin: 8px 0 14px; }
+.fin-cbar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; justify-content: flex-end; }
+.fin-cbar { width: 100%; border-radius: 5px 5px 0 0; min-height: 4px; }
+.fin-cbar-label { font-family: var(--mono); font-size: 8px; color: var(--muted); }
+.fin-cbar-amt   { font-family: var(--mono); font-size: 9px; font-weight: 700; }
+
+/* Add panel */
+.fin-panel-title {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
+  text-transform: uppercase; margin-bottom: 16px; color: var(--muted);
+}
+.fin-panel-title span { color: var(--amber); }
+.fin-section-head {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--muted); margin: 12px 0 6px;
+}
+.fin-cat-inputs { display: flex; flex-direction: column; gap: 6px; }
+.fin-cat-input-row { display: flex; align-items: center; gap: 8px; }
+.fin-cat-input-label {
+  font-family: var(--mono); font-size: 9px; text-transform: uppercase;
+  width: 100px; flex-shrink: 0; color: var(--muted);
+}
+.fin-cat-input-row input { margin-bottom: 0; flex: 1; }
+.fin-save-btn {
+  width: 100%; padding: 14px; background: var(--amber); color: #000;
+  border: none; border-radius: 14px; font-family: var(--mono); font-weight: 700;
+  font-size: 12px; letter-spacing: 2px; cursor: pointer; margin-top: 14px;
+}
+.fin-acct-select {
+  display: flex; gap: 8px; margin-bottom: 10px;
+}
+.fin-acct-opt {
+  flex: 1; padding: 10px; border-radius: 12px; text-align: center;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  font-family: var(--mono); font-size: 10px; cursor: pointer; transition: 0.2s;
+}
+.fin-acct-opt.selected { border-color: var(--amber); color: var(--amber); }
+
+/* ═══════════════════════════════════════════
    INCOME MODULE — v3.4 FLUID styles
 ═══════════════════════════════════════════ */
 .inc-wrap { padding: 0 18px 24px; }
@@ -400,6 +555,15 @@ select option { background: #141416; }
       <polyline points="16 7 22 7 22 13"/>
     </svg>
     <span class="nav-label">Trading</span>
+  </div>
+  <div class="nav-tab" data-mod="finance">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2"/>
+      <line x1="2" y1="10" x2="22" y2="10"/>
+      <line x1="7" y1="15" x2="9" y2="15"/>
+      <line x1="12" y1="15" x2="17" y2="15"/>
+    </svg>
+    <span class="nav-label">Finance</span>
   </div>
 </nav>
 
@@ -1071,7 +1235,495 @@ const TradingModule = {
 };
 
 /* ═══════════════════════════════════════════
-   MODULE 00 — GLOBAL DASHBOARD
+   MODULE 05 — FINANCE AUDIT v2.0
+   Dual-Account Forensic Engine
+═══════════════════════════════════════════ */
+const FinanceModule = {
+
+  STORAGE_KEY: 'truos-finance',
+  SCHEMA_VER: 2,
+
+  CATS: ['Dining','Groceries','Transport','Medical','Subscriptions','Personal Care','Entertainment','P2P / Cash','Other'],
+  CAT_COLORS: {
+    'Dining':'#ff6b81','Groceries':'#2ed573','Transport':'#1e90ff',
+    'Medical':'#a29bfe','Subscriptions':'#fd79a8','Personal Care':'#fdcb6e',
+    'Entertainment':'#e17055','P2P / Cash':'#636e72','Other':'#b2bec3'
+  },
+  ACCOUNTS: {
+    nfcu:   { name: 'Navy Federal', color: '#f5a623' },
+    acct_b: { name: 'Secondary Acct', color: '#9e61ff' }
+  },
+
+  _load() {
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      if (!raw) return this._seed();
+      const parsed = JSON.parse(raw);
+      return parsed.schemaVer === 2 ? parsed : this._migrateV1(parsed);
+    } catch { return this._seed(); }
+  },
+  _save(data) { localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data)); },
+
+  _migrateV1(v1) {
+    const v2 = { schemaVer: 2, accountNames: { nfcu: 'Navy Federal', acct_b: 'Secondary Acct' }, statements: {} };
+    Object.keys(v1).forEach(function(k) {
+      var s = v1[k];
+      if (s && s.schemaVer !== 2) {
+        v2.statements[k] = {
+          nfcu: { income: s.income || 0, spending: s.spending || {}, transfersOut: 0, transfersIn: 0, fees: 0, startBal: 0, endBal: 0, meta: s.meta || { period: k, days: 30 } },
+          acct_b: null
+        };
+      }
+    });
+    this._save(v2);
+    return v2;
+  },
+
+  _seed() {
+    const data = {
+      schemaVer: 2,
+      accountNames: { nfcu: 'Navy Federal', acct_b: 'Secondary Acct' },
+      statements: {
+        '2026-01': {
+          nfcu: {
+            income: 247.73, startBal: 161.85, endBal: 7.00,
+            spending: { 'Dining':70.21,'Groceries':7.21,'Transport':2.40,'Medical':10.56,'Subscriptions':0,'Personal Care':31.82,'Entertainment':0,'P2P / Cash':97.78,'Other':0 },
+            transfersOut: 182.60, transfersIn: 0, fees: 2.00,
+            meta: { period: 'January 2026', days: 30 }
+          },
+          acct_b: null
+        },
+        '2026-02': {
+          nfcu: {
+            income: 1220.00, startBal: 7.00, endBal: 50.04,
+            spending: { 'Dining':330.41,'Groceries':87.57,'Transport':15.57,'Medical':9.52,'Subscriptions':20.00,'Personal Care':43.33,'Entertainment':80.74,'P2P / Cash':89.82,'Other':0 },
+            transfersOut: 500.00, transfersIn: 0, fees: 0,
+            meta: { period: 'February 2026', days: 30 }
+          },
+          acct_b: null
+        }
+      }
+    };
+    this._save(data);
+    return data;
+  },
+
+  /* ── Netting Engine ── */
+  _netTransfers(stmtPeriod) {
+    const accts    = Object.values(stmtPeriod).filter(Boolean);
+    const totalOut = accts.reduce(function(s, a) { return s + (a.transfersOut || 0); }, 0);
+    const totalIn  = accts.reduce(function(s, a) { return s + (a.transfersIn  || 0); }, 0);
+    return { totalOut: totalOut, totalIn: totalIn, netted: Math.min(totalOut, totalIn) };
+  },
+
+  /* ── Unified period stats ── */
+  _periodStats(stmtPeriod) {
+    const accts   = Object.values(stmtPeriod).filter(Boolean);
+    const netting = this._netTransfers(stmtPeriod);
+    var totalIncome = 0, totalFees = 0;
+    const unifiedCats = {};
+    this.CATS.forEach(function(c) { unifiedCats[c] = 0; });
+    accts.forEach(function(a) {
+      totalIncome += (a.income || 0);
+      totalFees   += (a.fees   || 0);
+      Object.keys(a.spending).forEach(function(c) { if (unifiedCats[c] !== undefined) unifiedCats[c] += (a.spending[c] || 0); });
+    });
+    const totalSpend  = Object.values(unifiedCats).reduce(function(s, v) { return s + v; }, 0) + totalFees;
+    const days        = accts[0] ? (accts[0].meta.days || 30) : 30;
+    const net         = totalIncome - totalSpend - netting.netted;
+    const burnRate    = totalSpend / days;
+    const savingsRate = totalIncome > 0 ? ((totalIncome - totalSpend) / totalIncome) * 100 : 0;
+    return { totalIncome: totalIncome, totalSpend: totalSpend, totalFees: totalFees, net: net, burnRate: burnRate, savingsRate: savingsRate, unifiedCats: unifiedCats, netting: netting, days: days };
+  },
+
+  /* ── Pace: spendPct vs dayPct (income-based) ── */
+  _pace(stats, periodKey) {
+    // Only apply live pacing to the current month
+    const now    = new Date();
+    const yr     = now.getFullYear();
+    const mo     = String(now.getMonth() + 1).padStart(2, '0');
+    const curKey = yr + '-' + mo;
+    if (periodKey !== curKey) return null; // historical — no pacing
+    const dayPct   = (now.getDate() / stats.days) * 100;
+    const spendPct = stats.totalIncome > 0 ? (stats.totalSpend / stats.totalIncome) * 100 : 0;
+    const delta    = spendPct - dayPct;
+    var status;
+    if (delta > 10)       status = 'overpace';
+    else if (delta > 0)   status = 'watch';
+    else                  status = 'ontrack';
+    return { dayPct: dayPct, spendPct: spendPct, delta: delta, status: status };
+  },
+
+  /* ── Shift-to-Cost (net per 12hr base shift) ── */
+  _netPerShift() {
+    try {
+      const cfg  = IncomeModule.CFG;
+      const gross = cfg.baseRate * 12;
+      return gross * (1 - cfg.tax);
+    } catch { return 167.84; } // fallback: 17.31 * 12 * 0.808
+  },
+
+  /* ── 20% MoM Spike Detector ── */
+  _spikeFlags(data, currentKey) {
+    const keys = Object.keys(data.statements).sort();
+    const idx  = keys.indexOf(currentKey);
+    if (idx < 1) return [];
+    const prevStats = this._periodStats(data.statements[keys[idx - 1]]);
+    const currStats = this._periodStats(data.statements[currentKey]);
+    const flags = [];
+    var FM = this;
+    this.CATS.forEach(function(cat) {
+      const prev = prevStats.unifiedCats[cat];
+      const curr = currStats.unifiedCats[cat];
+      if (prev > 5 && curr > prev * 1.2) {
+        const pct = (((curr - prev) / prev) * 100).toFixed(0);
+        flags.push({ type: 'amber', icon: '📈', title: cat.toUpperCase() + ' SPIKE +' + pct + '%', detail: 'Was $' + prev.toFixed(2) + ' → now $' + curr.toFixed(2) + '. Extra spend: $' + (curr - prev).toFixed(2) + '.' });
+      }
+    });
+    return flags;
+  },
+
+  /* ── Subscription Creep: 2+ consecutive months ── */
+  _subFlags(data, currentKey) {
+    const keys = Object.keys(data.statements).sort();
+    const idx  = keys.indexOf(currentKey);
+    if (idx < 1) return [];
+    const curr     = data.statements[currentKey];
+    const prev     = data.statements[keys[idx - 1]];
+    const currSubs = Object.values(curr).filter(Boolean).reduce(function(s, a) { return s + (a.spending['Subscriptions'] || 0); }, 0);
+    const prevSubs = Object.values(prev).filter(Boolean).reduce(function(s, a) { return s + (a.spending['Subscriptions'] || 0); }, 0);
+    if (currSubs > 0 && prevSubs > 0)
+      return [{ type: 'blue', icon: '🔁', title: 'RECURRING SUBSCRIPTIONS · $' + currSubs.toFixed(2) + '/mo', detail: 'Charged 2+ consecutive periods. Review each: still needed?\nDetected: Claude.AI $20/mo (Feb 2026).' }];
+    return [];
+  },
+
+  /* ── Full flag suite — no dismiss ── */
+  _allFlags(data, key, stats, pace) {
+    const flags = [];
+
+    // Savings rate
+    if (stats.savingsRate < 0)
+      flags.push({ type: 'red',   icon: '🔴', title: 'DEFICIT PERIOD',                                          detail: 'Spent $' + Math.abs(stats.net).toFixed(2) + ' more than earned. Immediate corrective action required.' });
+    else if (stats.savingsRate < 10)
+      flags.push({ type: 'red',   icon: '🔴', title: 'LOW SAVINGS RATE · ' + stats.savingsRate.toFixed(1) + '%', detail: 'Floor is 10%. You are below it.' });
+    else if (stats.savingsRate < 20)
+      flags.push({ type: 'amber', icon: '🟡', title: 'SAVINGS BELOW 20% TARGET · ' + stats.savingsRate.toFixed(1) + '%', detail: 'Push toward 20%+ for real resilience.' });
+    else
+      flags.push({ type: 'green', icon: '✅', title: 'SAVINGS RATE HEALTHY · ' + stats.savingsRate.toFixed(1) + '%', detail: 'Above the 20% target. Strong execution.' });
+
+    // Pace flag (current month only)
+    if (pace) {
+      if (pace.status === 'overpace')
+        flags.push({ type: 'red',   icon: '🚨', title: 'OVERPACING · ' + pace.spendPct.toFixed(1) + '% SPENT vs ' + pace.dayPct.toFixed(1) + '% OF MONTH', detail: 'You are ' + Math.abs(pace.delta).toFixed(1) + ' percentage points ahead of schedule. Slow down or you will end the month in deficit.' });
+      else if (pace.status === 'watch')
+        flags.push({ type: 'amber', icon: '⚠️', title: 'WATCH PACE · ' + pace.spendPct.toFixed(1) + '% SPENT vs ' + pace.dayPct.toFixed(1) + '% OF MONTH', detail: 'Slightly ahead of the income-based spend curve. Monitor closely.' });
+      else
+        flags.push({ type: 'green', icon: '🟢', title: 'PACE ON TRACK · ' + pace.spendPct.toFixed(1) + '% SPENT vs ' + pace.dayPct.toFixed(1) + '% OF MONTH', detail: 'Spending is in line with how far through the month you are.' });
+    }
+
+    // Dining — with shift-to-cost
+    const dining       = stats.unifiedCats['Dining'] || 0;
+    const netPerShift  = this._netPerShift();
+    if (dining > 0) {
+      const shiftsUsed = (dining / netPerShift).toFixed(1);
+      const diningPct  = stats.totalSpend > 0 ? (dining / stats.totalSpend) * 100 : 0;
+      const flagType   = diningPct > 25 ? 'amber' : 'blue';
+      const flagTitle  = diningPct > 25
+        ? 'DINING OVER 25% OF SPEND · ' + diningPct.toFixed(1) + '%'
+        : 'DINING TRACKER · ' + diningPct.toFixed(1) + '% OF SPEND';
+      flags.push({ type: flagType, icon: '🍽️', title: flagTitle, detail: '$' + dining.toFixed(2) + ' on dining this period. Cut by 50% = +$' + (dining * 0.5).toFixed(0) + '/mo recovered.', shiftCost: '🏥 Cost: ' + shiftsUsed + ' Corewell 12hr shifts (' + netPerShift.toFixed(2) + ' net/shift)' });
+    }
+
+    // Fees
+    if (stats.totalFees > 0)
+      flags.push({ type: 'red', icon: '💸', title: 'BANK FEES · $' + stats.totalFees.toFixed(2), detail: 'ATM charges, overdraft, or denied transaction fees. 100% avoidable.' });
+
+    // Netting info
+    if (stats.netting.netted > 0)
+      flags.push({ type: 'blue', icon: '🔀', title: 'TRANSFER NETTING · $' + stats.netting.netted.toFixed(2) + ' ZEROED', detail: 'Cross-account flows removed from totals. Figures reflect true discretionary spend only.' });
+
+    // Burn rate info
+    flags.push({ type: 'blue', icon: '📊', title: 'DAILY BURN RATE · $' + stats.burnRate.toFixed(2) + '/day', detail: 'Your daily operational cost this period. × 30 = $' + (stats.burnRate * 30).toFixed(0) + ' projected monthly.' });
+
+    return [...flags, ...this._spikeFlags(data, key), ...this._subFlags(data, key)];
+  },
+
+  _activePeriod: null,
+  _panelOpen: false,
+  _addAcct: 'nfcu',
+  _cogOpen: false,
+  _advancedOpen: false,
+
+  init() {
+    const data  = this._load();
+    const keys  = Object.keys(data.statements).sort();
+    if (!this._activePeriod || !data.statements[this._activePeriod])
+      this._activePeriod = keys[keys.length - 1];
+
+    const stmt   = data.statements[this._activePeriod];
+    const stats  = this._periodStats(stmt);
+    const pace   = this._pace(stats, this._activePeriod);
+    const flags  = this._allFlags(data, this._activePeriod, stats, pace);
+    const netColor = stats.net >= 0 ? 'var(--green)' : 'var(--red)';
+    const srColor  = stats.savingsRate >= 20 ? 'var(--green)' : stats.savingsRate >= 10 ? 'var(--amber)' : 'var(--red)';
+
+    // Burn rate color from pace
+    var burnColor = 'var(--amber)';
+    if (pace) {
+      if (pace.status === 'overpace') burnColor = 'var(--red)';
+      else if (pace.status === 'ontrack') burnColor = 'var(--green)';
+    }
+    const paceLabel = pace
+      ? (pace.status === 'overpace' ? ' ⚠ OVERPACE' : pace.status === 'watch' ? ' ▲ WATCH' : ' ✓ ON TRACK')
+      : '';
+
+    // Period pills
+    const FM = this;
+    const periodPills = keys.map(function(k) {
+      const ref   = data.statements[k].nfcu || data.statements[k].acct_b;
+      const label = ref ? ref.meta.period.replace(' 2026', '') : k;
+      return '<div class="pill' + (k === FM._activePeriod ? ' active' : '') + '" onclick="FinanceModule._setPeriod(\'' + k + '\')">' + label + '</div>';
+    }).join('');
+
+    // Compact account header lines (change 4 + 5)
+    const acctLines = Object.entries(this.ACCOUNTS).map(function([id, def]) {
+      const a         = stmt[id];
+      const acctName  = (data.accountNames && data.accountNames[id]) || def.name;
+      if (!a) return '<div class="fin-acct-line"><span class="fin-acct-line-name" style="color:' + def.color + '40">' + acctName + '</span><span class="fin-acct-line-detail">no data this period</span></div>';
+      const acctSpend = Object.values(a.spending).reduce(function(s, v) { return s + v; }, 0) + (a.fees || 0);
+      return '<div class="fin-acct-line"><span class="fin-acct-line-name" style="color:' + def.color + '">' + acctName + '</span><span class="fin-acct-line-detail">$' + (a.startBal || 0).toFixed(0) + ' → $' + (a.endBal || 0).toFixed(0) + ' &nbsp;·&nbsp; +$' + a.income.toFixed(0) + ' in &nbsp;·&nbsp; −$' + acctSpend.toFixed(0) + ' out</span></div>';
+    }).join('');
+    const nettedLine = stats.netting.netted > 0
+      ? '<div class="fin-acct-netted">⇌ $' + stats.netting.netted.toFixed(2) + ' transfers netted</div>'
+      : '';
+
+    // Pace bar (change 7)
+    var paceBarHTML = '';
+    if (pace) {
+      const spendW  = Math.min(pace.spendPct, 100).toFixed(1);
+      const dayW    = Math.min(pace.dayPct, 100).toFixed(1);
+      const barColor = pace.status === 'overpace' ? 'var(--red)' : pace.status === 'watch' ? 'var(--amber)' : 'var(--green)';
+      paceBarHTML = '<div class="fin-pace-label"><span style="color:' + barColor + '">SPEND ' + pace.spendPct.toFixed(1) + '%</span><span style="color:var(--muted)">DAY ' + pace.dayPct.toFixed(1) + '% OF MONTH</span></div><div class="fin-pace-bar"><div class="fin-pace-spend" style="width:' + spendW + '%;background:' + barColor + '"></div><div class="fin-pace-day-marker" style="left:' + dayW + '%"></div></div>';
+    }
+
+    // Category bars (change 4 — no separate Phase 1 section)
+    const maxSpend = Math.max.apply(null, Object.values(stats.unifiedCats).concat([1]));
+    const catRows = this.CATS.map(function(cat) {
+      const total = stats.unifiedCats[cat] || 0;
+      if (total === 0) return '';
+      const color     = FM.CAT_COLORS[cat];
+      const pctOfMax  = (total / maxSpend) * 100;
+      const acctBars  = Object.entries(FM.ACCOUNTS).map(function([id, def]) {
+        const a = stmt[id];
+        if (!a) return '';
+        const av = a.spending[cat] || 0;
+        if (av === 0) return '';
+        const avPct = (av / maxSpend) * 100;
+        return '<div class="fin-cat-bar-track" title="' + ((data.accountNames && data.accountNames[id]) || def.name) + ': $' + av.toFixed(2) + '"><div class="fin-cat-bar-fill" style="width:' + avPct.toFixed(1) + '%;background:' + def.color + ';opacity:0.55"></div></div>';
+      }).filter(Boolean).join('');
+      return '<div class="fin-cat-row"><div class="fin-cat-top"><div class="fin-cat-name">' + cat + '</div><div class="fin-cat-dual-bar"><div class="fin-cat-bar-track"><div class="fin-cat-bar-fill" style="width:' + pctOfMax.toFixed(1) + '%;background:' + color + '"></div></div>' + acctBars + '</div><div class="fin-cat-amt" style="color:' + color + '">$' + total.toFixed(0) + '</div></div></div>';
+    }).filter(Boolean).join('');
+
+    // Flags — no dismiss button (change 1)
+    const flagsHTML = flags.length
+      ? flags.map(function(f) {
+          const shiftLine = f.shiftCost ? '<div class="fin-shift-cost">' + f.shiftCost + '</div>' : '';
+          return '<div class="fin-flag flag-' + f.type + '"><span class="fin-flag-icon">' + f.icon + '</span><div class="fin-flag-body"><div class="fin-flag-title">' + f.title + '</div><div class="fin-flag-detail">' + f.detail + shiftLine + '</div></div></div>';
+        }).join('')
+      : '<div class="empty-state">ALL CLEAR</div>';
+
+    // 3-month compare
+    const recent3 = keys.slice(-3);
+    const maxNet  = Math.max.apply(null, recent3.map(function(k) { return Math.abs(FM._periodStats(data.statements[k]).net); }).concat([1]));
+    const compareBars = recent3.map(function(k) {
+      const s   = FM._periodStats(data.statements[k]);
+      const ht  = (Math.abs(s.net) / maxNet) * 100;
+      const col = s.net >= 0 ? 'var(--green)' : 'var(--red)';
+      const ref = data.statements[k].nfcu || data.statements[k].acct_b;
+      const lbl = ref ? ref.meta.period.replace(' 2026', '').substring(0, 3).toUpperCase() : k;
+      return '<div class="fin-cbar-wrap"><div class="fin-cbar-amt" style="color:' + col + '">' + (s.net >= 0 ? '+' : '') + '$' + Math.abs(s.net).toFixed(0) + '</div><div class="fin-cbar" style="height:' + ht + '%;background:' + col + ';opacity:0.75"></div><div class="fin-cbar-label">' + lbl + '</div></div>';
+    }).join('');
+
+    // Quick Add panel (change 3) — 3 fields + Advanced toggle
+    const catInputs = this.CATS.map(function(c) {
+      return '<div class="fin-cat-input-row"><div class="fin-cat-input-label">' + c + '</div><input type="number" id="fin-cat-' + c.replace(/[\s\/]/g, '_') + '" placeholder="0.00" /></div>';
+    }).join('');
+
+    mount(
+      '<header class="mod-header">' +
+        '<div><span class="sys-label">TruOS · Module 05</span><h1 class="mod-title">Finance<br><em>Audit</em></h1></div>' +
+        '<div style="display:flex;align-items:flex-start;gap:10px">' +
+          '<div style="text-align:right">' +
+            '<div class="sys-label" style="margin-bottom:4px">Burn Rate</div>' +
+            '<div style="font-family:var(--mono);font-size:18px;font-weight:700;color:' + burnColor + '">$' + stats.burnRate.toFixed(2) + '<span style="font-size:9px;color:' + burnColor + '">' + paceLabel + '</span></div>' +
+          '</div>' +
+          '<button class="fin-cog-btn" onclick="FinanceModule._openCog()">⚙</button>' +
+        '</div>' +
+      '</header>' +
+      '<div class="fin-wrap">' +
+        '<div class="fin-period-row">' + periodPills + '<div class="pill" onclick="FinanceModule._openPanel(\'nfcu\')">+ Add</div></div>' +
+        // Compact account header (merged Phase 1+2)
+        '<div class="fin-acct-header-bar">' + acctLines + nettedLine + '</div>' +
+        paceBarHTML +
+        // Category bars
+        '<div class="fin-phase-head">Spend Breakdown · <span>' + (data.statements[this._activePeriod].nfcu || data.statements[this._activePeriod].acct_b).meta.period + '</span></div>' +
+        '<div class="fin-cats">' + catRows + '</div>' +
+        // Phase 3 flags
+        '<div class="fin-phase-head">Phase 3 · <span>Audit Flags</span></div>' +
+        '<div class="fin-flags">' + flagsHTML + '</div>' +
+        // 3-month trend
+        '<div class="fin-phase-head">3-Month Net Trend</div>' +
+        '<div class="fin-compare-bars">' + compareBars + '</div>' +
+      '</div>' +
+      // Phase 4 sticky
+      '<div class="fin-p4-sticky">' +
+        '<div class="fin-p4-metric"><span class="fin-p4-val" style="color:' + srColor + '">' + stats.savingsRate.toFixed(1) + '%</span><span class="fin-p4-sub">Savings Rate</span></div>' +
+        '<div class="fin-p4-metric"><span class="fin-p4-val" style="color:' + burnColor + '">$' + stats.burnRate.toFixed(2) + '</span><span class="fin-p4-sub">Burn / Day</span></div>' +
+        '<div class="fin-p4-metric"><span class="fin-p4-val" style="color:' + netColor + ';font-size:13px">' + (stats.net >= 0 ? '+' : '') + '$' + Math.abs(stats.net).toFixed(0) + '</span><span class="fin-p4-sub">Net Period</span></div>' +
+      '</div>' +
+      // Quick Add panel (change 3)
+      '<div class="slide-panel" id="fin-panel">' +
+        '<div class="fin-panel-title">+ Quick <span>Statement</span></div>' +
+        '<div class="fin-section-head">Account</div>' +
+        '<div class="fin-acct-select">' +
+          '<div class="fin-acct-opt' + (this._addAcct === 'nfcu' ? ' selected' : '') + '" onclick="FinanceModule._setAddAcct(\'nfcu\')">Navy Federal</div>' +
+          '<div class="fin-acct-opt' + (this._addAcct === 'acct_b' ? ' selected' : '') + '" onclick="FinanceModule._setAddAcct(\'acct_b\')">Secondary</div>' +
+        '</div>' +
+        '<input id="fin-period-label" placeholder="e.g. March 2026" />' +
+        '<input id="fin-income" type="number" placeholder="Total Income ($)" />' +
+        '<input id="fin-total-spend" type="number" placeholder="Total Spend ($)" />' +
+        '<input id="fin-dining-quick" type="number" placeholder="Dining ($)" />' +
+        '<button class="fin-advanced-toggle" onclick="FinanceModule._toggleAdvanced()">▸ Advanced breakdown</button>' +
+        '<div class="fin-advanced-section' + (this._advancedOpen ? ' open' : '') + '" id="fin-advanced">' +
+          '<div style="display:flex;gap:8px"><input id="fin-fees" type="number" placeholder="Fees ($)" style="flex:1" /><input id="fin-start-bal" type="number" placeholder="Start Bal ($)" style="flex:1" /></div>' +
+          '<div style="display:flex;gap:8px"><input id="fin-end-bal" type="number" placeholder="End Bal ($)" style="flex:1" /><input id="fin-xfer-out" type="number" placeholder="Transfers Out ($)" style="flex:1" /></div>' +
+          '<input id="fin-xfer-in" type="number" placeholder="Transfers In ($)" />' +
+          '<div class="fin-section-head">Per Category</div>' +
+          '<div class="fin-cat-inputs">' + catInputs + '</div>' +
+        '</div>' +
+        '<button class="fin-save-btn" onclick="FinanceModule._saveStatement()">SAVE STATEMENT</button>' +
+      '</div>'
+    );
+  },
+
+  _setPeriod(key) { this._activePeriod = key; this.init(); },
+  _setAddAcct(id) { this._addAcct = id; this.init(); setTimeout(function() { FinanceModule._openPanel(id); }, 50); },
+  _toggleAdvanced() {
+    this._advancedOpen = !this._advancedOpen;
+    const el = document.getElementById('fin-advanced');
+    const btn = document.querySelector('.fin-advanced-toggle');
+    if (el) el.classList.toggle('open', this._advancedOpen);
+    if (btn) btn.textContent = (this._advancedOpen ? '▾ ' : '▸ ') + 'Advanced breakdown';
+  },
+
+  _openPanel(acctId) {
+    if (acctId) this._addAcct = acctId;
+    this._panelOpen = true;
+    const el = document.getElementById('fin-panel');
+    if (el) el.classList.add('open');
+  },
+  _closePanel() {
+    this._panelOpen = false;
+    const el = document.getElementById('fin-panel');
+    if (el) el.classList.remove('open');
+  },
+
+  // Change 6 — Settings cog modal for rename
+  _openCog() {
+    this._cogOpen = true;
+    const data = this._load();
+    const nfcuName   = (data.accountNames && data.accountNames['nfcu'])   || 'Navy Federal';
+    const acctbName  = (data.accountNames && data.accountNames['acct_b']) || 'Secondary Acct';
+    const modal = document.createElement('div');
+    modal.className = 'fin-cog-modal';
+    modal.id = 'fin-cog-modal';
+    modal.innerHTML =
+      '<div class="fin-cog-inner">' +
+        '<div class="fin-cog-title">⚙ ACCOUNT SETTINGS</div>' +
+        '<div class="fin-cog-row"><div class="fin-cog-label">Navy Federal Label</div><input id="fin-cog-nfcu" value="' + nfcuName + '" /></div>' +
+        '<div class="fin-cog-row"><div class="fin-cog-label">Secondary Account Label</div><input id="fin-cog-acctb" value="' + acctbName + '" /></div>' +
+        '<button class="fin-cog-save" onclick="FinanceModule._saveCog()">SAVE CHANGES</button>' +
+        '<button class="fin-cog-close" onclick="FinanceModule._closeCog()">Cancel</button>' +
+      '</div>';
+    document.body.appendChild(modal);
+  },
+  _saveCog() {
+    const data  = this._load();
+    const nfcu  = document.getElementById('fin-cog-nfcu');
+    const acctb = document.getElementById('fin-cog-acctb');
+    if (!data.accountNames) data.accountNames = {};
+    if (nfcu  && nfcu.value.trim())  data.accountNames['nfcu']   = nfcu.value.trim();
+    if (acctb && acctb.value.trim()) data.accountNames['acct_b'] = acctb.value.trim();
+    this._save(data);
+    this._closeCog();
+    Shell.toast('Settings saved');
+    this.init();
+  },
+  _closeCog() {
+    const el = document.getElementById('fin-cog-modal');
+    if (el) el.parentNode.removeChild(el);
+    this._cogOpen = false;
+  },
+
+  _saveStatement() {
+    const label = document.getElementById('fin-period-label') ? document.getElementById('fin-period-label').value.trim() : '';
+    if (!label) { Shell.toast('Enter a period label', true); return; }
+
+    const income      = parseFloat((document.getElementById('fin-income')       || {}).value) || 0;
+    const totalSpend  = parseFloat((document.getElementById('fin-total-spend')  || {}).value) || 0;
+    const diningQuick = parseFloat((document.getElementById('fin-dining-quick') || {}).value) || 0;
+    const fees        = parseFloat((document.getElementById('fin-fees')         || {}).value) || 0;
+    const startBal    = parseFloat((document.getElementById('fin-start-bal')    || {}).value) || 0;
+    const endBal      = parseFloat((document.getElementById('fin-end-bal')      || {}).value) || 0;
+    const xferOut     = parseFloat((document.getElementById('fin-xfer-out')     || {}).value) || 0;
+    const xferIn      = parseFloat((document.getElementById('fin-xfer-in')      || {}).value) || 0;
+
+    const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+    const parts  = label.toLowerCase().split(' ');
+    const mIdx   = months.indexOf(parts[0]);
+    const yr     = parts[1] || '2026';
+    const key    = mIdx >= 0 ? (yr + '-' + String(mIdx + 1).padStart(2, '0')) : label.replace(/\s+/g, '-').toLowerCase();
+
+    // If advanced open, read per-cat; else distribute totalSpend with dining carved out
+    var spending = {};
+    if (this._advancedOpen) {
+      this.CATS.forEach(function(c) {
+        const el = document.getElementById('fin-cat-' + c.replace(/[\s\/]/g, '_'));
+        spending[c] = parseFloat((el || {}).value) || 0;
+      });
+    } else {
+      this.CATS.forEach(function(c) { spending[c] = 0; });
+      spending['Dining'] = diningQuick;
+      spending['Other']  = Math.max(0, totalSpend - diningQuick - fees);
+    }
+
+    const data = this._load();
+    if (!data.statements[key]) data.statements[key] = { nfcu: null, acct_b: null };
+    data.statements[key][this._addAcct] = { income: income, spending: spending, startBal: startBal, endBal: endBal, transfersOut: xferOut, transfersIn: xferIn, fees: fees, meta: { period: label, days: 30 } };
+    this._save(data);
+    this._activePeriod = key;
+    this._advancedOpen = false;
+    this._closePanel();
+    Shell.toast('Statement saved');
+    this.init();
+  },
+
+  stats() {
+    const data = this._load();
+    const keys = Object.keys(data.statements).sort();
+    if (!keys.length) return null;
+    const latest = data.statements[keys[keys.length - 1]];
+    const stats  = this._periodStats(latest);
+    const ref    = latest.nfcu || latest.acct_b;
+    return Object.assign({}, stats, { period: ref ? ref.meta.period : keys[keys.length - 1] });
+  },
+
+  teardown() { this._panelOpen = false; if (this._cogOpen) this._closeCog(); }
+};
+
+
+
+/* ═══════════════════════════════════════════
    Reads all three storage keys fresh on every
    mount. No shared state — localStorage IS
    the bus.
@@ -1244,6 +1896,43 @@ const DashboardModule = {
           <div class="dash-tap-hint">TAP TO OPEN TERMINAL →</div>
         </div>
 
+        <!-- Finance card -->
+        ${(() => {
+          const fin = FinanceModule.stats();
+          if (!fin) return `
+            <div class="dash-card" onclick="Shell.switchTo('finance')">
+              <div class="dash-card-top">
+                <span class="dash-card-label">Finance · Audit</span>
+                <span class="dash-card-badge badge-warn">NO DATA</span>
+              </div>
+              <div class="dash-sub">No statements logged yet.</div>
+              <div class="dash-tap-hint">TAP TO ADD STATEMENT →</div>
+            </div>`;
+          const netColor  = fin.net >= 0 ? 'var(--green)' : 'var(--red)';
+          const srColor   = fin.savingsRate >= 20 ? 'var(--green)' : fin.savingsRate >= 10 ? 'var(--amber)' : 'var(--red)';
+          const finBadge  = fin.savingsRate < 10
+            ? `<span class="dash-card-badge badge-warn">${fin.savingsRate.toFixed(1)}% SAVINGS</span>`
+            : `<span class="dash-card-badge badge-ok">${fin.savingsRate.toFixed(1)}% SAVINGS</span>`;
+          return `
+            <div class="dash-card" onclick="Shell.switchTo('finance')">
+              <div class="dash-card-top">
+                <span class="dash-card-label">Finance · ${esc(fin.period)}</span>
+                ${finBadge}
+              </div>
+              <div style="display:flex;gap:16px;align-items:flex-end">
+                <div>
+                  <div class="dash-val" style="color:${netColor}">${fin.net >= 0 ? '+' : ''}$${Math.abs(fin.net).toFixed(0)}</div>
+                  <div class="dash-sub">net this period</div>
+                </div>
+                <div style="padding-bottom:2px">
+                  <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--amber)">$${fin.burnRate.toFixed(2)}</div>
+                  <div class="dash-sub">daily burn</div>
+                </div>
+              </div>
+              <div class="dash-tap-hint">TAP TO VIEW AUDIT →</div>
+            </div>`;
+        })()}
+
       </div>
     `);
   },
@@ -1262,7 +1951,7 @@ const DashboardModule = {
 /* ═══════════════════════════════════════════
    BOOT
 ═══════════════════════════════════════════ */
-Shell.modules = { dashboard: DashboardModule, income: IncomeModule, academic: AcademicModule, trading: TradingModule };
+Shell.modules = { dashboard: DashboardModule, income: IncomeModule, academic: AcademicModule, trading: TradingModule, finance: FinanceModule };
 Shell.init();
 </script>
 </body>
