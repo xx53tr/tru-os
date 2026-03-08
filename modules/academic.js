@@ -1,4 +1,5 @@
 'use strict';
+import { esc, mount, nowClock } from '../utils.js';
 
 export default {
   CFG: { class1: "MAT 151 (Math)", class2: "PSY 101 (Psych)" },
