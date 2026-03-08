@@ -1,14 +1,6 @@
 'use strict';
 
-/* ── Shared utils ── */
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-function mount(html) { document.getElementById('main-content').innerHTML = html; }
-function nowClock() {
-  return {
-    time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
-    date: new Date().toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' }).toUpperCase()
-  };
-}
+import { esc, mount, nowClock } from './utils.js';
 
 /* ── Module registry ── */
 window.__truos_modules = {};
@@ -17,20 +9,14 @@ const _loaded = {};
 
 async function loadModule(name) {
   if (_loaded[name]) return _loaded[name];
-
   const mod = await import(`./modules/${name}.js`);
-
-  if (!mod || !mod.default) {
-    throw new Error(`Module failed to load: ${name}`);
-  }
-
+  if (!mod || !mod.default) throw new Error(`Module failed to load: ${name}`);
   _loaded[name] = mod.default;
   window.__truos_modules[name] = mod.default;
   return mod.default;
 }
 
-/* ── Shell ── */
-const Shell = {
+export const Shell = {
   _active:        null,
   _clockInterval: null,
   _activeKey:     null,
@@ -92,7 +78,6 @@ const Shell = {
 
     const parts    = html.split('<\/body>');
     const exported = parts[0] + bootstrap + '\n<\/body>' + (parts[1] || '');
-
     const blob = new Blob([exported], { type: 'text/html' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
@@ -109,6 +94,9 @@ const Shell = {
     t._timer = setTimeout(() => t.className = '', 2400);
   }
 };
+
+/* ── expose globally for modules that call Shell.toast/switchTo ── */
+window.Shell = Shell;
 
 /* ── Boot ── */
 document.getElementById('shell-nav').addEventListener('click', e => {
