@@ -1,292 +1,137 @@
 # CLAUDE.md — TruOS Project Instructions
-> Senior developer context file. Load this before every session. Last updated: March 2026.
+> Last updated: March 2026 · Single source of truth for every session.
 
 ---
 
-## 1. WHO I AM
+## 1. PURPOSE
 
-**Name:** Truquan Raheem (Tru)  
-**Location:** Bloomfield Hills, Michigan  
-**Work:** CNA at Corewell Health — midnight shifts, 6:30 PM – 7:00 AM  
-**School:** College student — currently enrolled in MAT 151 and PSY 101  
-**Deployment context:** I build and maintain TruOS between shifts, during breaks, and on off days. Sessions are often short. Context must load fast.
+TruOS is Truquan's personal operating system — a single-file web app that consolidates income optimization, academic tracking, paper trading, and forensic bank auditing into one offline-capable tool. It runs entirely in the browser with no backend. Data lives in `localStorage`. The goal is financial clarity and scheduling discipline on a CNA midnight-shift income.
+
+**[ADDED]** Tru works midnight shifts at Corewell Health (6:30 PM – 7:00 AM) and is enrolled in MAT 151 and PSY 101. Sessions are often short and between shifts — context must load fast.
 
 ---
 
-## 2. HOW WE WORK — NON-NEGOTIABLE RULES
+## 2. REPO MAP
 
-These apply to every session, every task, no exceptions.
+```
+/
+├── index.html          ← Entry point (modular split — pending deploy)
+├── shell.js            ← Shell object, loadModule(), boot sequence
+├── TruOS-Unified.html  ← Active working file (single-file version)
+└── modules/
+    ├── dashboard.js    ← Home screen, cross-module summary badges
+    ├── income.js       ← Shift scheduler, CFG (base $17.31, differentials, OT logic)
+    ├── academic.js     ← Canvas ICS import, urgency tiers, overdue detection
+    ├── trading.js      ← Paper portfolio, live Yahoo Finance prices, academic gate
+    └── finance.js      ← Dual-account audit, Calendar Slice schema, AI PDF upload
+```
 
-### 2.1 Plan Mode First
-- **For any non-trivial task:** Write the full plan BEFORE touching any code.
-- "Non-trivial" = anything that touches more than one function, modifies existing logic, adds a new module, or has side effects on other parts of the app.
-- The plan must include: what changes, what files are affected, what the expected output is, and what could break.
-- I approve the plan before you write a single line of code.
-- **Trivial exceptions** (no plan required): typo fixes, color changes, copy edits, one-liner patches with no side effects.
-
-### 2.2 Stop-and-Replan Protocol
-- If something breaks mid-session, **stop immediately.**
-- Do not patch on top of a broken state. Do not guess.
-- Write a new plan. Explain what broke and why. Get my approval before continuing.
-- Shipping working code slowly is better than shipping broken code fast.
-
-### 2.3 No Assumptions
-- If something is ambiguous — ask. One question, clearly stated.
-- Do not infer what I want and build it anyway. Do not fill in gaps with guesses.
-- Especially for: schema changes, module interactions, anything touching Firebase, and any UX flow change.
-
-### 2.4 Minimal Code Impact
-- Change the minimum amount of code required to accomplish the task.
-- Do not refactor things I didn't ask you to refactor.
-- Do not improve things I didn't ask you to improve.
-- If you notice a bug or smell while working — flag it in a comment at the end of the session. Don't fix it silently.
-
-### 2.5 Verify Before Done
-- After every build: syntax check, logic check, confirm the feature works as described.
-- If you can run a validation — run it. Don't mark something complete because you think it should work.
-- State explicitly when something is verified vs. when it's assumed.
-
-### 2.6 No Feature Creep
-- Build exactly what was spec'd. No extras.
-- If you think something would be a great addition — say so after the task is done. Never add it silently.
+**[ADDED]** Live URL: `tru-os.vercel.app` · Deploy: GitHub main → Vercel auto-deploy (~30 seconds) · Repo: private on GitHub (confirm — was briefly public).
 
 ---
 
-## 3. TRUOS — PROJECT OVERVIEW
+## 3. KEY CONSTANTS
 
-TruOS is my personal operating system. It is a single self-contained HTML file — no frameworks, no build tools, no dependencies, no backend. Everything is vanilla JavaScript and CSS, stored in localStorage, with Firebase Realtime Database for cross-device sync.
+```
+Income base rate:      $17.31/hr
+Afternoon diff:        +$2.50/hr
+Midnight diff:         +$2.75/hr
+Weekend diff:          +$2.00/hr
+Tax rate:              19.2% effective
+Net per 12hr shift:    $167.84
+Biweekly net target:   $2,000
 
-**Live URL:** `tru-os.vercel.app`  
-**Deploy pipeline:** Local file → GitHub (main branch) → Vercel auto-deploy → Global CDN  
-**Primary file:** `TruOS-Unified.html`  
-**Repo:** Private on GitHub  
-**Sync layer:** Firebase Realtime Database (project: `realtime-database-ebc45`)
+Accounts:
+  nfcu   Navy Federal Credit Union   (teal)
+  wf     Wells Fargo                 (purple · #9e61ff)
 
-### Core constraints — never violate these:
-- ❌ No frameworks (no React, no Vue, no Alpine)
-- ❌ No build steps (no webpack, no Vite, no npm)
-- ❌ No external scripts loaded at runtime (except Firebase SDK via CDN)
-- ❌ No backend — Firebase is the only remote service
-- ✅ Single HTML file — everything inline (CSS + JS + HTML)
-- ✅ localStorage for primary persistence
-- ✅ Firebase TruDB layer for cross-device sync
-- ✅ Works offline (degrades gracefully if Firebase is unreachable)
+localStorage schema version:  3
+Period key format:             YYYY-MM-CAL
+```
+
+**[ADDED]** OT logic: Sequential — calculated block-by-block chronologically. OT kicks in after 40 total hours in the week. Differentials stay flat at OT — they do NOT multiply at 1.5x. Do not calculate OT proportionally.
+
+**[ADDED]** Limits: 100 assignment ceiling · 10 shift max per 2-week period.
 
 ---
 
-## 4. ARCHITECTURE
+## 4. HOW WE WORK — NON-NEGOTIABLE RULES
 
-### 4.1 Module Registry
+### 4.1 Plan Mode (default for all non-trivial tasks)
+Stop. Write the plan. Get confirmation. Then build. If something breaks mid-build, stop and re-plan before continuing.
 
-| Tab # | Module Name | Accent Color | Status |
-|-------|-------------|--------------|--------|
-| 1 | Dashboard | — (aggregates all) | Stable |
-| 2 | Income Optimizer | Amber | Stable |
-| 3 | Academic Tracker | Purple | Stable (post-v2 redesign) |
-| 4 | Trading Terminal | Red | Stable (locked behind overdue check) |
-| 5 | Finance Audit | Blue | In progress — period alignment pending |
+**[ADDED — detail]** The plan must include: what changes, what files are affected, what the expected output is, and what could break. Tru approves before a single line of code is written.
 
-### 4.2 Navigation
-```css
-/* Nav grid — must stay repeat(5, 1fr) for 5 tabs */
-.nav-grid { display: grid; grid-template-columns: repeat(5, 1fr); }
-```
-If a 6th tab is added in the future, update to `repeat(6, 1fr)`.
+**[ADDED]** Trivial exceptions (no plan required): typo fixes, color changes, copy edits, one-liner patches with no side effects on other modules.
 
-### 4.3 Design Token System
-```css
-/* Color system — each module has an assigned accent */
---amber:   income / financial positive states
---purple:  academic / study
---red:     trading / alerts / overdue
---green:   positive outcomes / savings / complete
---blue:    finance audit / banking
+### 4.2 [ADDED] Stop-and-Replan Protocol
+If something breaks mid-session — stop immediately. Do not patch on top of a broken state. Do not guess. Write a new plan, explain what broke and why, get approval before continuing. Shipping working code slowly beats shipping broken code fast.
 
-/* Background: dark glass aesthetic — deep navy/charcoal base */
-/* Text: near-white on dark — never pure black backgrounds */
-```
+### 4.3 Code Standards
+- Vanilla JS only — no frameworks, no build step
+- `'use strict'` in every module file
+- No logic changes when refactoring structure
+- Confirm dialogs required for all destructive actions (see Section 6.2 for implementation)
 
-### 4.4 TruDB Sync Layer
-- Custom abstraction over Firebase Realtime Database
-- All reads/writes go through TruDB — never call Firebase directly from module logic
-- Writes simultaneously to localStorage (instant) and Firebase (async)
-- Real-time listeners push changes across devices
-- Sync badge in top-right corner shows connection status (green = live, gray = offline)
-- Anonymous auth — two registered device UIDs in Firebase security rules
+### 4.4 [ADDED] Minimal Code Impact
+Change the minimum amount of code required to accomplish the task. Do not refactor things that weren't asked. Do not silently improve things. If a bug or smell is noticed while working — flag it in a comment at the end of the session. Don't fix it without asking.
 
-**Firebase config:**
-```javascript
-apiKey: "AIzaSyCNAzcnmXuuPkUQljum0p8GEAPe-YBh2bU"
-projectId: "realtime-database-ebc45"
-databaseURL: "https://realtime-database-ebc45-default-rtdb.firebaseio.com"
-```
+### 4.5 [ADDED] No Feature Creep
+Build exactly what was spec'd. If something would be a great addition — say so after the task is done. Never add it silently.
+
+### 4.6 [ADDED] Verify Before Done
+After every build: syntax check, logic check, confirm the feature works as described. State explicitly when something is verified vs. assumed. Don't mark something complete because it should work — confirm it does.
 
 ---
 
-## 5. MODULE SPECS
+## 5. DATA RULES
 
-### 5.1 Module 01 — Dashboard
-- Aggregates data from all other modules
-- Shows: income gap to target, upcoming assignments with urgency badges, account balances summary, trading terminal status
-- Badge counts: overdue assignments (red) + within-72hr assignments (amber) — pulled from Academic module
-- No data entry here — read-only aggregate view
+- Never auto-commit parsed data — always show a review step first
+- Net same-amount back-and-forth Zelle flows before reporting spend
+- Accuracy over speed — verify figures before writing any code that touches stored data
 
-### 5.2 Module 02 — Income Optimizer (Payroll Grade)
-
-**Corewell Health Pay Structure:**
-```
-Base rate:           $17.31/hr
-Afternoon diff:      +$2.50/hr   (shifts overlapping afternoon window)
-Midnight diff:       +$2.75/hr   (shifts overlapping midnight window)
-Weekend diff:        +$2.00/hr   (Sat/Sun shifts)
-Sitter pay:         (tracked separately — ask for current rate)
-Overtime:           Sequential — OT kicks in after 40 total hours in the week
-                    NOT proportional — calculated block-by-block chronologically
-OT multiplier:       1.5x base rate (differentials stay flat — they do NOT multiply)
-Net target:         $2,000 biweekly
-Tax rate estimate:   ~20% effective (for shift-to-cost translator in Finance module)
-```
-
-**Shift types:**
-```
-8-hour shift  vs  12-hour shift (toggle in UI)
-My actual shift: 6:30 PM – 7:00 AM (12.5 hours)
-```
-
-**Key logic note:** OT must be calculated chronologically across the biweekly period — add shifts in time order, apply regular rate until 40 hours are hit, then switch to OT rate for remaining hours. Do not calculate OT proportionally.
-
-### 5.3 Module 03 — Academic Tracker
-
-**Current courses:**
-- MAT 151 (Math)
-- PSY 101 (Psychology)
-
-**Data source:** Canvas LMS — ICS file import (`.ics` format)
-
-**Deduplication rule:** An assignment is a duplicate only if ALL THREE match:
-```javascript
-item.title === current.title &&
-item.dueDate === current.dueDate &&
-item.cls === current.cls   // ← class must also match — different classes can share assignment names
-```
-
-**Week grouping formula:**
-```javascript
-weekNumber = Math.floor((dueDate - minDate) / 7) + 1
-// minDate = earliest due date in the entire dataset
-// Groups labeled: "Week 1", "Week 2", etc.
-```
-
-**Urgency tiers:**
-```
-Overdue:      red     — past due date
-Within 72hr:  amber   — due within next 72 hours
-Upcoming:     default — everything else
-```
-
-**Completed section:** Collapsed by default at bottom. Has a "Purge" button to clear completed items. Purge requires custom modal confirmation — never use `window.confirm()`.
-
-**Dashboard badge:** Shows combined count of (overdue + within-72hr) items.
-
-### 5.4 Module 04 — Trading Terminal
-
-**Gate check:** On `TradingModule.init()`, check if any Academic assignments are overdue. If yes — lock the terminal with a message. Must complete overdue work before accessing trading.
-
-```javascript
-// Lock gate — do not remove or comment out
-if (AcademicModule.hasOverdue()) {
-  TradingModule.showLock("Complete overdue assignments to unlock trading.");
-  return;
-}
-```
-
-This is intentional accountability design. Do not bypass it even if I ask casually.
-
-### 5.5 Module 05 — Finance Audit (🚧 In Progress)
-
-**Purpose:** Forensic multi-account banking analysis. Tracks real spending, nets cross-account transfers, flags anomalies, and translates dining spend into Corewell shift equivalents.
-
-**Account schema:**
-```
-acct_a:  NFCU (Navy Federal Credit Union) — primary checking
-acct_b:  Wells Fargo — secondary checking
-```
-
-**⚠️ OPEN ARCHITECTURAL DECISION — resolve before writing any cross-account code:**
-Period alignment between NFCU and Wells Fargo statement cycles is not aligned. Three options were presented — decision is pending. Options:
-
-1. **Separate keys** — store each account's data under its own statement period key. No cross-account math. Cleanest isolation.
-2. **Calendar month buckets** — normalize all transactions to calendar month (Jan, Feb, etc.) regardless of statement period. Enables cross-account math. Recommended.
-3. **Standalone WF view** — display Wells Fargo as its own audit with no cross-account aggregation.
-
-**Ask me which option to use before writing any schema or data model code.**
-
-**Features already built:**
-- Phase 1 account strips (compact header lines above category bars)
-- Quick Add interface (3-field fast entry with Advanced toggle)
-- Cross-account Zelle transfer netting (transfers between my own accounts net to zero)
-- Income-based pace indicator formula:
-  ```
-  spendPct = currentSpend / totalMonthlyIncome
-  dayPct   = currentDay / daysInMonth
-  pace     = spendPct vs dayPct  (over/under pace)
-  ```
-- Shift-to-cost translator:
-  ```
-  netPerShift = baseRate × 12hrs × (1 - taxRate)
-  // Uses values from IncomeModule.CFG — do not hardcode
-  // taxRate pulled from Income module config, not hardcoded
-  diningShifts = diningSpend / netPerShift
-  ```
-- Audit flags — permanent (no dismiss button — accountability is by design)
-- Account rename — settings cog modal in module header only (not inline on card)
-
-**Forensic patterns to flag automatically:**
-- Circular Zelle patterns (same amount out and in with same contact)
-- Large one-time inflows (flag as non-recurring — don't let them inflate savings rate)
-- Single merchant appearing across both accounts in same period
-- Dining spend exceeding X shifts worth of net pay (threshold TBD — ask me)
+**[ADDED]** Never touch stored data without a plan-mode step. Schema version is `3` — if a migration is required, write the migration script separately, show it, get approval, then run it.
 
 ---
 
 ## 6. HARD TECHNICAL CONSTRAINTS
 
-These are non-negotiable. Every session, every change.
+These are non-negotiable. Every session, every change. All of these are bugs that have actually been hit in production.
 
-### 6.1 No Optional Chaining
-Safari (iOS) rejects optional chaining syntax and silently fails the entire script.
+### 6.1 [ADDED] No Optional Chaining
+Safari (iOS) rejects optional chaining syntax and silently fails the entire script — no error, just a blank screen.
 ```javascript
-// ❌ NEVER — breaks Safari
+// ❌ NEVER
 this._active?.teardown()
 
 // ✅ ALWAYS
 this._active && this._active.teardown()
 ```
 
-### 6.2 No Browser Dialogs
-Safari can suppress `confirm()`, `alert()`, and `prompt()` after first dismissal.
+### 6.2 No Browser Dialogs → Custom Modal
 ```javascript
-// ❌ NEVER
+// ❌ NEVER — Safari suppresses after first dismissal
 if (confirm("Delete this?")) { ... }
 
 // ✅ ALWAYS — use TruOS custom modal
 TruOS.modal.confirm("Delete this?", () => { ... });
 ```
+This covers all destructive actions referenced in Section 4.3.
 
-### 6.3 XSS Safety
-All user-facing string output must be escaped:
+### 6.3 [ADDED] XSS Safety
+All user-facing string output must be escaped before writing to the DOM:
 ```javascript
 // ❌ NEVER
 element.innerHTML = userInput;
 
-// ✅ ALWAYS use the esc() utility
+// ✅ ALWAYS
 element.innerHTML = esc(userInput);
 ```
 
-### 6.4 No Direct Firebase Calls from Modules
-All Firebase reads/writes must go through the TruDB layer:
+### 6.4 [ADDED] Firebase / TruDB Rules
+All Firebase reads/writes go through the TruDB layer — never call Firebase directly from module logic:
 ```javascript
-// ❌ NEVER — bypasses sync layer
+// ❌ NEVER
 firebase.database().ref('path').set(data);
 
 // ✅ ALWAYS
@@ -294,85 +139,111 @@ TruDB.set('path', data);
 TruDB.get('path', callback);
 ```
 
-### 6.5 Persist to Both Stores
-Every write must hit both localStorage and Firebase:
+---
+
+## 7. MODULE SPECS
+
+### Dashboard
+Aggregates data from all other modules. Shows: income gap to target, upcoming assignments with urgency badges, account balance summary, trading terminal status. Badge count = overdue (red) + within-72hr (amber) assignments. Read-only — no data entry.
+
+### Income (`income.js`)
+Shift scheduler pulling from `IncomeModule.CFG`. OT calculated sequentially (see Section 3). Net per shift used by Finance module shift-to-cost translator — always pull from CFG, never hardcode.
+
+### Academic (`academic.js`)
+Canvas ICS import. Deduplication rule — all three must match to be a duplicate:
 ```javascript
-// TruDB handles this internally — but verify when debugging sync issues
-// localStorage = instant local state
-// Firebase = cross-device sync
+item.title === current.title &&
+item.dueDate === current.dueDate &&
+item.cls === current.cls  // ← class must match — different classes can share assignment names
 ```
+Urgency tiers: `overdue` = red · `within 72hr` = amber · `upcoming` = default.
+Week grouping: `Math.floor((dueDate - minDate) / 7) + 1` anchored to earliest due date.
+Completed section: collapsed by default, Purge button requires custom modal confirmation.
+
+### Trading (`trading.js`)
+Paper portfolio with live Yahoo Finance prices. **Academic gate — do not remove:**
+```javascript
+// Lock gate in TradingModule.init() — intentional accountability design
+if (AcademicModule.hasOverdue()) {
+  TradingModule.showLock("Complete overdue assignments to unlock trading.");
+  return;
+}
+```
+Do not bypass this even if asked casually.
+
+### Finance (`finance.js`)
+Dual-account forensic audit. Calendar Slice schema — period key format `YYYY-MM-CAL`.
+
+**Accounts:** `nfcu` (teal) · `wf` (Wells Fargo, purple `#9e61ff`)
+
+**Pace indicator formula:**
+```
+spendPct = currentSpend / totalMonthlyIncome
+dayPct   = currentDay / daysInMonth
+pace     = spendPct vs dayPct
+```
+
+**Shift-to-cost translator:**
+```
+netPerShift = $167.84  (pulled from IncomeModule.CFG — never hardcode)
+diningShifts = diningSpend / netPerShift
+```
+
+**Forensic flags (auto-detect):**
+- Circular Zelle patterns (same amount out + in with same contact)
+- Large one-time inflows (flag as non-recurring — don't inflate savings rate)
+- Single merchant appearing across both accounts in same period
+
+**[ADDED]** Audit flags are permanent — no dismiss button. Accountability is by design. Do not add a dismiss button even if asked.
 
 ---
 
-## 7. DEPLOYMENT WORKFLOW
+## 8. AI UPLOAD (Finance Module)
+
+- API key stored in `sessionStorage` only — never `localStorage`
+- Mismatch detection: user-picked account vs Claude-detected bank header → orange warning
+- Parsed result held in `_uploadParsed` until user taps COMMIT
+- Never auto-commit — review step is mandatory (see Section 5)
+
+---
+
+## 9. DEPLOY WORKFLOW
 
 ```
-1. Edit TruOS-Unified.html locally
-2. git add TruOS-Unified.html
+1. Edit locally (TruOS-Unified.html or module files)
+2. git add .
 3. git commit -m "descriptive message"
 4. git push origin main
-5. Vercel auto-deploys — live in ~30 seconds at tru-os.vercel.app
+5. Vercel auto-deploys — live in ~30 seconds
 ```
 
-**Never:**
-- Upload directly through Vercel UI (loses version history)
-- Push broken code to main (it goes live immediately)
-- Commit Firebase credentials in plaintext comments or console logs
-
-**Before every push — verify:**
-- [ ] No optional chaining (`?.`)
+**[ADDED] Pre-push checklist — verify before every push:**
+- [ ] No optional chaining (`?.`) anywhere in the file
 - [ ] No `window.confirm()` / `window.alert()` / `window.prompt()`
 - [ ] No raw `innerHTML` with unescaped user input
 - [ ] TruDB layer intact (sync badge renders, Firebase listeners attached)
 - [ ] Trading terminal lock gate present in `TradingModule.init()`
 - [ ] Nav grid column count matches tab count
+- [ ] No Firebase credentials in console logs or comments
 
 ---
 
-## 8. SESSION HANDOFF PROTOCOL
+## 10. MODULAR SPLIT STATUS
 
-When a session is ending and work isn't complete:
-
-1. Summarize: what was accomplished, what's pending, what decisions are open
-2. State explicitly: what the next session needs to know to pick up cleanly
-3. If there's an open architectural decision — document the options clearly so I can decide between sessions
-4. Export or paste the current working file state if there were significant changes
-
-At the START of a new session, I may paste this file or a summary. Read it before doing anything. Then ask: "What are we working on today?"
+Architecture finalized, files generated (`truos-modular.zip`), deploy blocked pending GitHub access. Resume when ready — no logic changes required, just push and point Vercel at `index.html`. Do not re-architect or re-generate — the split is done.
 
 ---
 
-## 9. THINGS I'M BUILDING TOWARD
+## 11. [ADDED] COMMUNICATION PREFERENCES
 
-Context for strategic suggestions — don't build these unless I ask, but know they're coming:
-
-- **Paystub Log module** — upload paystub, auto-parse against template, update running average, flag gap to $2k target
-- **Real Estate Monitor** — Michigan foreclosures under $100k, track price drops + days on market
-- **Finance Agent** — automated monthly forensic summary from bank statement uploads
-- **Academic Deadline Agent** — Canvas ICS watcher with urgency-tier push notifications
-
-**Business ventures (research phase, not TruOS):**
-- Dual-track NEMT + medical cleaning business (Michigan market)
-- Smoke shop partnership in LA (content/brand play — not ownership)
-- Fix-and-flip real estate (Michigan auctions, sub-$100k)
-
-**Career trajectory:**
-- Current: CNA → BSN track → Clinical Informatics (target: 4 years)
-- AI literacy plan in progress (Phase 3 — portfolio building)
-- Corewell Health background = competitive advantage for health system informatics roles
+- **Direct and concise.** No filler, no excessive affirmations.
+- **Senior dev tone.** Peer, not teacher.
+- **Match response length to task complexity.** Short task = short response.
+- **Plan mode is not optional.** Even if Tru says "just do it quick" — if the task is non-trivial, write the plan first. Push back if needed.
+- **Flag issues, don't hide them.** If a problem is spotted while working — say so at the end. Don't silently ignore it.
+- **One question at a time.** If something is ambiguous, ask one clear question. Don't build on assumptions.
+- **Voice input note.** Tru sometimes uses voice prompts — messages may be short but intent runs deep. Match depth to what's actually being asked.
 
 ---
 
-## 10. COMMUNICATION PREFERENCES
-
-- **Direct and concise.** No filler. No excessive affirmations.
-- **Senior dev tone.** Talk to me like a peer, not a student.
-- **Short responses for small tasks.** Match response length to task complexity.
-- **Plan mode is not optional.** Even if I say "just do it quick" — if the task is non-trivial, write the plan first. Push back if needed.
-- **Flag issues, don't hide them.** If you see a problem while working — say so. Don't silently let it go.
-- **Don't repeat yourself.** If you said it once, don't re-explain it in the same response.
-- **Voice prompts get longer responses** — I sometimes use voice input. Match depth to what I'm actually asking, not how long the message is.
-
----
-
-*This file lives at the root of the TruOS GitHub repo. Update it when architecture changes, new modules are added, or working agreements change. It is the single source of truth for every Claude session on this project.*
+*This file lives at the root of the TruOS GitHub repo. Update it when architecture changes, new modules are added, or working agreements change.*
