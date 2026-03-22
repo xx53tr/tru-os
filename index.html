@@ -614,6 +614,7 @@ const TruDB = {
         }
         TruDB._migrateAcademic();
         TruDB._migrateIncome();
+        TruDB._migrateFinance();
       }).catch(function(e) { console.warn('TruDB: auth failed', e); });
       // Track connection state for sync badge
       this._db.ref('.info/connected').on('value', function(snap) {
@@ -726,6 +727,31 @@ const TruDB = {
       });
     }).catch(function(e) {
       console.warn('TruDB: income migration failed, will retry on next load', e);
+    });
+  },
+
+  // One-time migration: push truos-finance from localStorage → Firebase
+  // Same pattern as _migrateAcademic / _migrateIncome — retries on next load if write fails.
+  _migrateFinance() {
+    if (localStorage.getItem('truos-finance-migrated')) return;
+    var local = localStorage.getItem('truos-finance');
+    if (!local) {
+      localStorage.setItem('truos-finance-migrated', '1');
+      return;
+    }
+    var path = this._path('truos-finance');
+    this._db.ref(path).once('value').then(function(snap) {
+      if (snap.val() !== null) {
+        // Firebase already has data — nothing to migrate
+        localStorage.setItem('truos-finance-migrated', '1');
+        return;
+      }
+      return TruDB._db.ref(path).set(local).then(function() {
+        localStorage.setItem('truos-finance-migrated', '1');
+        console.info('TruDB: truos-finance migrated from localStorage to Firebase');
+      });
+    }).catch(function(e) {
+      console.warn('TruDB: finance migration failed, will retry on next load', e);
     });
   }
 };
@@ -1647,7 +1673,7 @@ const FinanceModule = {
   /* ── Storage ── */
   _load() {
     try {
-      var raw = localStorage.getItem(this.STORAGE_KEY);
+      var raw = TruDB.get(this.STORAGE_KEY);
       if (!raw) return this._seed();
       var p = JSON.parse(raw);
       if (p.schemaVer === 3) return p;
@@ -1655,7 +1681,7 @@ const FinanceModule = {
       return this._migrateV1toV3(p);
     } catch(e) { return this._seed(); }
   },
-  _save(d) { localStorage.setItem(this.STORAGE_KEY, JSON.stringify(d)); },
+  _save(d) { TruDB.set(this.STORAGE_KEY, d); },
 
   /* ── Migration v2 → v3 ── */
   _migrateV2toV3(v2) {
@@ -1976,6 +2002,11 @@ const FinanceModule = {
     var keys = Object.keys(data.statements).sort();
     if (!this._activePeriod || !data.statements[this._activePeriod])
       this._activePeriod = keys[keys.length - 1];
+    // Real-time sync — re-render when another device writes
+    TruDB.on('truos-finance', function(remote) {
+      if (!remote || !remote.statements) return;
+      FinanceModule.init();
+    });
 
     var stmt  = data.statements[this._activePeriod];
     var stats = this._periodStats(stmt);
