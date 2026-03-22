@@ -9,6 +9,9 @@
 <title>TruOS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
 /* ═══════════════════════════════════════════
    SHELL — Tokens & layout
@@ -491,11 +494,23 @@ select option { background: #141416; }
 .locked-icon { font-size: 48px; opacity: 0.25; }
 .locked-title { font-size: 22px; font-weight: 800; color: var(--muted); }
 .locked-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; line-height: 2; }
+
+/* ── Sync badge ── */
+.sync-badge {
+  position: fixed; top: 12px; right: 14px;
+  font-family: var(--mono); font-size: 8px; letter-spacing: 1.5px;
+  color: var(--muted); z-index: 1000; pointer-events: none;
+  transition: color 0.4s;
+}
+.sync-badge.online  { color: var(--green); }
+.sync-badge.offline { color: var(--muted); }
+.sync-badge.syncing { color: var(--amber); }
 </style>
 </head>
 <body>
 
 <div id="shell-toast"></div>
+<div id="sync-badge" class="sync-badge">○ OFFLINE</div>
 <div id="main-content"></div>
 <button class="export-btn" onclick="Shell.exportState()" title="Export with data">⬇ EXPORT</button>
 
@@ -545,6 +560,123 @@ select option { background: #141416; }
 'use strict';
 
 /* ═══════════════════════════════════════════
+   FIREBASE CONFIG
+═══════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyCNAzcnmXuuPkUQljum0p8GEAPe-YBh2bU",
+  authDomain:        "realtime-database-ebc45.firebaseapp.com",
+  databaseURL:       "https://realtime-database-ebc45-default-rtdb.firebaseio.com",
+  projectId:         "realtime-database-ebc45",
+  storageBucket:     "realtime-database-ebc45.firebasestorage.app",
+  messagingSenderId: "712853625298",
+  appId:             "1:712853625298:web:ea3001eaf8b9f2c067100b"
+};
+
+/* ═══════════════════════════════════════════
+   TruDB — Firebase + localStorage sync layer
+   ─────────────────────────────────────────
+   • All reads hit localStorage first (instant, works offline)
+   • All writes go to localStorage AND Firebase simultaneously
+   • Real-time listeners push remote changes to every open device
+   • If Firebase is not configured, runs fully on localStorage only
+═══════════════════════════════════════════ */
+const TruDB = {
+  _db:        null,
+  _listeners: {},
+  _ready:     false,
+
+  init() {
+    const configured = FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.startsWith('PASTE');
+    if (!configured) {
+      console.info('TruDB: Firebase not configured — running on localStorage only');
+      return;
+    }
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      this._db    = firebase.database();
+      this._ready = true;
+      // Silent anonymous sign-in — locked to your specific UID in rules
+      firebase.auth().signInAnonymously().then(function(cred) {
+        var uid = cred.user.uid;
+        localStorage.setItem('truos-owner-uid', uid);
+        var badge = document.getElementById('sync-badge');
+        if (badge && !localStorage.getItem('truos-uid-locked')) {
+          badge.style.pointerEvents = 'auto';
+          badge.style.cursor = 'pointer';
+          badge.title = 'Click to copy your UID for Firebase rules';
+          badge.addEventListener('click', function() {
+            navigator.clipboard.writeText(uid).then(function() {
+              Shell.toast('UID COPIED — PASTE INTO FIREBASE RULES');
+            });
+          });
+          badge.textContent = '⚠ COPY UID';
+          badge.className = 'sync-badge syncing';
+        }
+      }).catch(function(e) { console.warn('TruDB: auth failed', e); });
+      // Track connection state for sync badge
+      this._db.ref('.info/connected').on('value', function(snap) {
+        var badge = document.getElementById('sync-badge');
+        if (!badge) return;
+        if (snap.val()) {
+          badge.textContent = '● SYNCED';
+          badge.className   = 'sync-badge online';
+        } else {
+          badge.textContent = '○ OFFLINE';
+          badge.className   = 'sync-badge offline';
+        }
+      });
+    } catch(e) {
+      console.warn('TruDB: Firebase init failed, running offline:', e);
+      this._ready = false;
+    }
+  },
+
+  // Normalize localStorage key → Firebase path
+  _path(key) { return '/truos/' + key.replace(/[.#$\[\]]/g, '_'); },
+
+  // Write to localStorage immediately + push to Firebase
+  set(key, value) {
+    var json = JSON.stringify(value);
+    try { localStorage.setItem(key, json); } catch(e) {}
+    if (this._ready && this._db) {
+      var badge = document.getElementById('sync-badge');
+      if (badge) { badge.textContent = '↑ SYNCING'; badge.className = 'sync-badge syncing'; }
+      this._db.ref(this._path(key)).set(json).catch(function(e) { console.warn('TruDB write error:', e); });
+    }
+  },
+
+  // Read from localStorage cache (synchronous, instant)
+  get(key) { return localStorage.getItem(key); },
+
+  // Subscribe to real-time changes from any device
+  // cb(parsedValue) fires whenever another device writes
+  on(key, cb) {
+    if (!this._ready || !this._db) return;
+    if (this._listeners[key]) this._listeners[key].off();
+    var ref = this._db.ref(this._path(key));
+    this._listeners[key] = ref;
+    ref.on('value', function(snap) {
+      var remote = snap.val();
+      if (remote === null || remote === undefined) return;
+      var local = localStorage.getItem(key);
+      if (remote !== local) {
+        try { localStorage.setItem(key, remote); } catch(e) {}
+        try { cb(JSON.parse(remote)); } catch(e) { cb(remote); }
+      }
+    });
+  },
+
+  off(key) {
+    if (this._listeners[key]) {
+      this._listeners[key].off();
+      delete this._listeners[key];
+    }
+  },
+
+  offAll() { Object.keys(this._listeners).forEach(function(k) { TruDB.off(k); }); }
+};
+
+/* ═══════════════════════════════════════════
    SHELL
 ═══════════════════════════════════════════ */
 const Shell = {
@@ -553,6 +685,7 @@ const Shell = {
   modules: {},
 
   init() {
+    TruDB.init();
     document.getElementById('shell-nav').addEventListener('click', e => {
       const tab = e.target.closest('[data-mod]');
       if (tab) this.switchTo(tab.dataset.mod);
@@ -563,7 +696,9 @@ const Shell = {
   switchTo(name) {
     const mod = this.modules[name];
     if (!mod) return;
-    if (this._active?.teardown) this._active.teardown();
+    // No optional chaining — Safari fails silently on ?.
+    if (this._active && this._active.teardown) this._active.teardown();
+    TruDB.offAll();
     if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.mod === name));
     document.querySelectorAll('.slide-panel, .fab').forEach(el => el.remove());
@@ -616,6 +751,25 @@ const Shell = {
     t.className = 'show' + (isErr ? ' err' : '');
     clearTimeout(t._timer);
     t._timer = setTimeout(() => t.className = '', 2400);
+  },
+
+  // Custom confirm modal — replaces window.confirm (Safari suppresses after first use)
+  confirm(msg, onOk) {
+    var existing = document.getElementById('shell-confirm-modal');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.id = 'shell-confirm-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;padding-bottom:max(32px,env(safe-area-inset-bottom))';
+    overlay.innerHTML = '<div style="background:#141516;border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:24px 20px;width:calc(100% - 40px);max-width:440px;font-family:var(--mono)">'
+      + '<div style="font-size:12px;letter-spacing:1px;margin-bottom:20px;line-height:1.6;color:var(--text)">' + esc(msg) + '</div>'
+      + '<div style="display:flex;gap:10px">'
+      + '<button id="scm-cancel" style="flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:1px;cursor:pointer">CANCEL</button>'
+      + '<button id="scm-ok" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--red);color:#fff;font-family:var(--mono);font-size:11px;letter-spacing:1px;font-weight:700;cursor:pointer">CONFIRM</button>'
+      + '</div></div>';
+    document.body.appendChild(overlay);
+    document.getElementById('scm-cancel').addEventListener('click', function() { overlay.remove(); });
+    document.getElementById('scm-ok').addEventListener('click', function() { overlay.remove(); onOk(); });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
   }
 };
 
@@ -885,10 +1039,10 @@ const IncomeModule = {
         this.render(); this.bindEvents(); return;
       }
       if (action === 'clear-all') {
-        if (confirm('Clear both weeks?')) {
+        Shell.confirm('Clear both weeks?', () => {
           this.state.weeks = this.emptyWeeks();
           this.save(); this.render(); this.bindEvents();
-        }
+        });
         return;
       }
       if (action === 'set-type') {
@@ -918,14 +1072,20 @@ const AcademicModule = {
 
   init() {
     try {
-      const raw = localStorage.getItem('truos-academic');
+      const raw = TruDB.get('truos-academic');
       this.state.assignments = raw ? JSON.parse(raw) : [];
-    } catch { 
-      this.state.assignments = []; 
+    } catch(e) {
+      this.state.assignments = [];
     }
-    this.state.filter = localStorage.getItem('truos-ac-filter') || 'all';
+    this.state.filter = TruDB.get('truos-ac-filter') || 'all';
     this.render();
     this.bindEvents();
+    // Real-time sync — re-render when another device writes
+    TruDB.on('truos-academic', data => {
+      this.state.assignments = Array.isArray(data) ? data : [];
+      this.render();
+      this.bindEvents();
+    });
   },
 
   importICS(text) {
@@ -958,7 +1118,7 @@ const AcademicModule = {
       }
     });
 
-    const existing = JSON.parse(localStorage.getItem('truos-academic') || '[]');
+    const existing = JSON.parse(TruDB.get('truos-academic') || '[]');
     const combined = [...existing, ...events].reduce((acc, current) => {
       const isDup = acc.find(item => item.title === current.title && item.due === current.due && item.cls === current.cls);
       if (!isDup) acc.push(current);
@@ -971,8 +1131,8 @@ const AcademicModule = {
   },
 
   save() {
-    localStorage.setItem('truos-academic', JSON.stringify(this.state.assignments));
-    localStorage.setItem('truos-ac-filter', this.state.filter);
+    TruDB.set('truos-academic', this.state.assignments);
+    TruDB.set('truos-ac-filter', this.state.filter);
     this.render();
     this.bindEvents();
   },
@@ -1136,14 +1296,15 @@ const AcademicModule = {
   },
 
   purgeCompleted() {
-    if (!confirm('Remove all completed assignments?')) return;
-    this.state.assignments = this.state.assignments.filter(a => !a.done);
-    this.state.completedOpen = false;
-    this.save();
-    Shell.toast('COMPLETED TASKS PURGED');
+    Shell.confirm('Remove all completed assignments?', () => {
+      this.state.assignments = this.state.assignments.filter(a => !a.done);
+      this.state.completedOpen = false;
+      this.save();
+      Shell.toast('COMPLETED TASKS PURGED');
+    });
   },
 
-  setFilter(f) { this.state.filter = f; localStorage.setItem('truos-ac-filter', f); this.render(); },
+  setFilter(f) { this.state.filter = f; TruDB.set('truos-ac-filter', f); this.render(); },
   toggle(id) {
     const a = this.state.assignments.find(x => x.id === id);
     if (a) a.done = !a.done;
