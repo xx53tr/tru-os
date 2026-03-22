@@ -1407,7 +1407,7 @@ const AcademicModule = {
 const TradingModule = {
   init() {
     try {
-      const acData = JSON.parse(localStorage.getItem('truos-academic') || '[]');
+      const acData = JSON.parse(TruDB.get('truos-academic') || '[]');
       const now    = new Date();
       const overdue = acData.filter(a => !a.done && new Date(a.due) < now);
       overdue.length > 0 ? this.renderLocked(overdue.length) : this.renderActive();
@@ -1470,7 +1470,7 @@ const DashboardModule = {
   _incomeStats() {
     const CFG = IncomeModule.CFG;
     try {
-      const raw = localStorage.getItem('truos_schedule_v34');
+      const raw = TruDB.get('truos_schedule_v34');
       const weeks = raw ? JSON.parse(raw) : IncomeModule.emptyWeeks();
       if (!Array.isArray(weeks) || weeks.length !== 2) return { net: 0, hrs: 0, pct: 0, gap: CFG.target };
       const calcs  = weeks.map(w => IncomeModule.calcWeek(w));
@@ -1485,7 +1485,7 @@ const DashboardModule = {
 
   _academicStats() {
     try {
-      const raw  = localStorage.getItem('truos-academic');
+      const raw  = TruDB.get('truos-academic');
       const data = raw ? JSON.parse(raw) : [];
       const now  = new Date();
       const in72 = new Date(now.getTime() + 72 * 36e5);
@@ -1644,7 +1644,6 @@ const DashboardModule = {
 const FinanceModule = {
 
   STORAGE_KEY: 'truos-finance',
-  SCHEMA_VER: 3,
 
   CATS: ['Dining','Groceries','Transport','Medical','Subscriptions','Personal Care','Entertainment','P2P','Other'],
   CAT_COLORS: {
@@ -1714,94 +1713,6 @@ const FinanceModule = {
     return { schemaVer: 3, accountNames: { nfcu: 'Navy Federal', wf: 'Wells Fargo' }, statements: {} };
   },
 
-  /* ── Seed — verified forensic data ── */
-  _seed() {
-    var data = this._emptyStore();
-
-    // ── JANUARY 2026-01-CAL ──
-    // NFCU Jan: verified $247.73 income, $402.58 total spend
-    // Category breakdown best-effort from session notes; $72.10 in Other (gap)
-    data.statements['2026-01-CAL'] = {
-      nfcu: {
-        income: 247.73, startBal: 161.85, endBal: 7.00, fees: 2.00,
-        transfersOut: 0, transfersIn: 0,
-        spending: {
-          'Dining': 70.21, 'Groceries': 7.21, 'Transport': 2.40,
-          'Medical': 10.56, 'Subscriptions': 0, 'Personal Care': 31.82,
-          'Entertainment': 0, 'P2P': 162.78, 'Other': 72.10
-        },
-        meta: { period: 'January 2026', cal_start: '2026-01-01', cal_end: '2026-01-31',
-                stmt_start: '2025-12-22', stmt_end: '2026-01-21', days: 31,
-                note: 'Category breakdown partial — $72.10 unidentified (statement not uploaded)' }
-      },
-      // WF Jan calendar slice: $3,487.58 income, $0 spend (all WF Jan withdrawals posted 2/5-2/6)
-      wf: {
-        income: 3487.58, startBal: 25.00, endBal: 2086.08, fees: 0,
-        transfersOut: 0, transfersIn: 0,
-        spending: {
-          'Dining': 0, 'Groceries': 0, 'Transport': 0,
-          'Medical': 0, 'Subscriptions': 0, 'Personal Care': 0,
-          'Entertainment': 0, 'P2P': 0, 'Other': 0
-        },
-        meta: { period: 'January 2026', cal_start: '2026-01-01', cal_end: '2026-01-31',
-                stmt_start: '2026-01-09', stmt_end: '2026-02-06', days: 31,
-                note: 'WF Jan = pure accumulation. All withdrawals posted 2/5-2/6 → Feb slice.' }
-      }
-    };
-
-    // ── FEBRUARY 2026-02-CAL ──
-    // All figures verified to the penny against both statements
-    data.statements['2026-02-CAL'] = {
-      nfcu: {
-        income: 720.00, startBal: 7.00, endBal: 50.04, fees: 0,
-        transfersOut: 0, transfersIn: 720.00,
-        spending: {
-          'Dining': 330.41, 'Groceries': 87.57, 'Transport': 15.57,
-          'Medical': 9.52, 'Subscriptions': 20.00, 'Personal Care': 43.33,
-          'Entertainment': 80.74, 'P2P': 89.82, 'Other': 0
-        },
-        zelleSelf: { received: 720.00, txnCount: 13, avgAmt: 55.38 },
-        meta: { period: 'February 2026', cal_start: '2026-02-01', cal_end: '2026-02-28',
-                stmt_start: '2026-01-22', stmt_end: '2026-02-21', days: 28,
-                note: 'Income = WF transfers received. Quran $500 pass-through (same-day $500 ATM out) zeroed.' }
-      },
-      wf: {
-        // Income: Corewell $1553.53 + Corewell $1868.22 = $3421.75 recurring
-        // McKayla $1000 one-time stored separately in meta
-        // Lennox $93.06 return nets with Lenny send (already in P2P)
-        income: 3421.75, startBal: 2086.08, endBal: 3923.43, fees: 3.00,
-        transfersOut: 820.00, transfersIn: 0,
-        spending: {
-          'Dining': 416.11, 'Groceries': 80.31, 'Transport': 132.34,
-          'Medical': 26.05, 'Subscriptions': 0, 'Personal Care': 82.47,
-          'Entertainment': 499.76, 'P2P': 173.06, 'Other': 37.80
-        },
-        zelleSelf: {
-          sent: 820.00, txnCount: 15, avgAmt: 54.67,
-          // breakdown by date for tracker
-          transfers: [
-            { date: '2/7',  amt: 100 }, { date: '2/7',  amt: 20 },
-            { date: '2/10', amt: 20  }, { date: '2/10', amt: 10 },
-            { date: '2/11', amt: 40  }, { date: '2/12', amt: 30 },
-            { date: '2/13', amt: 80  }, { date: '2/14', amt: 20 },
-            { date: '2/14', amt: 100 }, { date: '2/14', amt: 100 },
-            { date: '2/14', amt: 100 }, { date: '2/16', amt: 20 },
-            { date: '2/20', amt: 40  }, { date: '2/20', amt: 40 },
-            { date: '2/25', amt: 100 }
-          ]
-        },
-        meta: {
-          period: 'February 2026', cal_start: '2026-02-01', cal_end: '2026-02-28',
-          stmt_start: '2026-02-07', stmt_end: '2026-03-06', days: 28,
-          incomeOneTime: 1000.00, incomeOneTimeSource: 'Bass McKayla — source unverified',
-          note: 'transfersOut $820: $720 received by NFCU Feb, $100 received by NFCU Mar (2/25 timing).'
-        }
-      }
-    };
-
-    this._save(data);
-    return data;
-  },
 
   /* ── Netting Engine ── */
   _netTransfers(stmt) {
