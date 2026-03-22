@@ -34,7 +34,7 @@ export const Shell = {
       return;
     }
 
-    if (this._active?.teardown) this._active.teardown();
+    if (this._active && this._active.teardown) this._active.teardown();
     if (this._clockInterval) { clearInterval(this._clockInterval); this._clockInterval = null; }
 
     document.querySelectorAll('.nav-tab').forEach(t =>
@@ -84,6 +84,25 @@ export const Shell = {
     a.href = url; a.download = 'TruOS-Unified.html'; a.click();
     URL.revokeObjectURL(url);
     Shell.toast('STATE EXPORTED — OPEN ON ANY DEVICE');
+  },
+
+  confirm(msg, onOk) {
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center';
+    overlay.innerHTML =
+      '<div style="background:#0a0a0c;border-radius:24px 24px 0 0;padding:28px 20px 48px;width:100%;max-width:480px;border-top:1px solid rgba(255,255,255,0.12)">'
+      + '<div style="font-family:\'Space Mono\',monospace;font-size:13px;color:#fff;margin-bottom:20px;letter-spacing:0.5px">' + esc(msg) + '</div>'
+      + '<button id="_truos-ok" style="width:100%;padding:14px;background:#ff4757;color:#fff;border:none;border-radius:14px;font-family:\'Space Mono\',monospace;font-weight:700;font-size:12px;letter-spacing:2px;cursor:pointer;margin-bottom:8px">CONFIRM</button>'
+      + '<button id="_truos-cancel" style="width:100%;padding:12px;background:transparent;border:none;color:rgba(255,255,255,0.45);font-family:\'Space Mono\',monospace;font-size:10px;cursor:pointer">CANCEL</button>'
+      + '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#_truos-ok').addEventListener('click', function() {
+      document.body.removeChild(overlay);
+      onOk();
+    });
+    overlay.querySelector('#_truos-cancel').addEventListener('click', function() {
+      document.body.removeChild(overlay);
+    });
   },
 
   toast(msg, isErr = false) {

@@ -5,7 +5,7 @@ export default {
 
   /* ── Exact CONFIG from v3.4 ── */
   CFG: {
-    baseRate:    17.31,
+    baseRate:    17.83,
     diffs:       { afternoon: 2.50, midnight: 2.75, weekend: 2.00 },
     tax:         0.192,
     otThreshold: 40,
@@ -76,6 +76,17 @@ export default {
 
   fmt(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
 
+  /* ── Week index from real date — Sunday 07:00 boundary per Corewell schedule ── */
+  _currentWeekIndex() {
+    // Subtract 7h so Sunday 00:00–06:59 still reads as Saturday (prior week).
+    var shifted = new Date(Date.now() - 7 * 3600000);
+    // Anchor: 2026-03-22 07:00 = confirmed Week 1 start. Update if pay period shifts.
+    var ANCHOR_MS = new Date(2026, 2, 22, 7, 0, 0).getTime();
+    var MS_PER_WEEK = 7 * 24 * 3600000;
+    var weeksSince = Math.floor((shifted.getTime() - ANCHOR_MS) / MS_PER_WEEK);
+    return ((weeksSince % 2) + 2) % 2; // 0 or 1, handles negative mod
+  },
+
   /* ── Storage ── */
   init() {
     // Hydrate fresh each mount — no stale IIFE state
@@ -90,7 +101,7 @@ export default {
       this.state.weeks = this.emptyWeeks();
       localStorage.removeItem('truos_schedule_v34');
     }
-    this.state.activeWeek = 0;
+    this.state.activeWeek = this._currentWeekIndex();
     this.render();
     this.bindEvents();
   },
@@ -252,10 +263,10 @@ export default {
         this.render(); this.bindEvents(); return;
       }
       if (action === 'clear-all') {
-        if (confirm('Clear both weeks?')) {
+        Shell.confirm('Clear both weeks?', () => {
           this.state.weeks = this.emptyWeeks();
           this.save(); this.render(); this.bindEvents();
-        }
+        });
         return;
       }
       if (action === 'set-type') {

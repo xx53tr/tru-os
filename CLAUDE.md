@@ -33,7 +33,7 @@ TruOS is Truquan's personal operating system — a single-file web app that cons
 ## 3. KEY CONSTANTS
 
 ```
-Income base rate:      $17.31/hr
+Income base rate:      $17.83/hr  (3% raise effective 2026-04-10)
 Afternoon diff:        +$2.50/hr
 Midnight diff:         +$2.75/hr
 Weekend diff:          +$2.00/hr
