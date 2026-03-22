@@ -599,19 +599,6 @@ const TruDB = {
       firebase.auth().signInAnonymously().then(function(cred) {
         var uid = cred.user.uid;
         localStorage.setItem('truos-owner-uid', uid);
-        var badge = document.getElementById('sync-badge');
-        if (badge && !localStorage.getItem('truos-uid-locked')) {
-          badge.style.pointerEvents = 'auto';
-          badge.style.cursor = 'pointer';
-          badge.title = 'Click to copy your UID for Firebase rules';
-          badge.addEventListener('click', function() {
-            navigator.clipboard.writeText(uid).then(function() {
-              Shell.toast('UID COPIED — PASTE INTO FIREBASE RULES');
-            });
-          });
-          badge.textContent = '⚠ COPY UID';
-          badge.className = 'sync-badge syncing';
-        }
         TruDB._migrateAcademic();
         TruDB._migrateIncome();
         TruDB._migrateFinance();
