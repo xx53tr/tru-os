@@ -612,6 +612,7 @@ const TruDB = {
           badge.textContent = '⚠ COPY UID';
           badge.className = 'sync-badge syncing';
         }
+        TruDB._migrateAcademic();
       }).catch(function(e) { console.warn('TruDB: auth failed', e); });
       // Track connection state for sync badge
       this._db.ref('.info/connected').on('value', function(snap) {
@@ -673,7 +674,34 @@ const TruDB = {
     }
   },
 
-  offAll() { Object.keys(this._listeners).forEach(function(k) { TruDB.off(k); }); }
+  offAll() { Object.keys(this._listeners).forEach(function(k) { TruDB.off(k); }); },
+
+  // One-time migration: push truos-academic from localStorage → Firebase
+  // Runs only if Firebase is authenticated and the key hasn't been migrated yet.
+  // Flag is set after a successful write (or if there's nothing to migrate),
+  // so a failed write retries on next load rather than being silently skipped.
+  _migrateAcademic() {
+    if (localStorage.getItem('truos-ls-to-fb-migrated')) return;
+    var local = localStorage.getItem('truos-academic');
+    if (!local) {
+      localStorage.setItem('truos-ls-to-fb-migrated', '1');
+      return;
+    }
+    var path = this._path('truos-academic');
+    this._db.ref(path).once('value').then(function(snap) {
+      if (snap.val() !== null) {
+        // Firebase already has data — nothing to migrate
+        localStorage.setItem('truos-ls-to-fb-migrated', '1');
+        return;
+      }
+      return TruDB._db.ref(path).set(local).then(function() {
+        localStorage.setItem('truos-ls-to-fb-migrated', '1');
+        console.info('TruDB: truos-academic migrated from localStorage to Firebase');
+      });
+    }).catch(function(e) {
+      console.warn('TruDB: academic migration failed, will retry on next load', e);
+    });
+  }
 };
 
 /* ═══════════════════════════════════════════
