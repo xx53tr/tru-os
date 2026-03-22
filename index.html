@@ -613,6 +613,7 @@ const TruDB = {
           badge.className = 'sync-badge syncing';
         }
         TruDB._migrateAcademic();
+        TruDB._migrateIncome();
       }).catch(function(e) { console.warn('TruDB: auth failed', e); });
       // Track connection state for sync badge
       this._db.ref('.info/connected').on('value', function(snap) {
@@ -700,6 +701,31 @@ const TruDB = {
       });
     }).catch(function(e) {
       console.warn('TruDB: academic migration failed, will retry on next load', e);
+    });
+  },
+
+  // One-time migration: push truos_schedule_v34 from localStorage → Firebase
+  // Same pattern as _migrateAcademic — retries on next load if write fails.
+  _migrateIncome() {
+    if (localStorage.getItem('truos-income-migrated')) return;
+    var local = localStorage.getItem('truos_schedule_v34');
+    if (!local) {
+      localStorage.setItem('truos-income-migrated', '1');
+      return;
+    }
+    var path = this._path('truos_schedule_v34');
+    this._db.ref(path).once('value').then(function(snap) {
+      if (snap.val() !== null) {
+        // Firebase already has data — nothing to migrate
+        localStorage.setItem('truos-income-migrated', '1');
+        return;
+      }
+      return TruDB._db.ref(path).set(local).then(function() {
+        localStorage.setItem('truos-income-migrated', '1');
+        console.info('TruDB: truos_schedule_v34 migrated from localStorage to Firebase');
+      });
+    }).catch(function(e) {
+      console.warn('TruDB: income migration failed, will retry on next load', e);
     });
   }
 };
@@ -895,23 +921,29 @@ const IncomeModule = {
   init() {
     // Hydrate fresh each mount — no stale IIFE state
     try {
-      const raw = localStorage.getItem('truos_schedule_v34');
+      const raw = TruDB.get('truos_schedule_v34');
       this.state.weeks = raw ? JSON.parse(raw) : this.emptyWeeks();
       // Validate shape
       if (!Array.isArray(this.state.weeks) || this.state.weeks.length !== 2) {
         this.state.weeks = this.emptyWeeks();
       }
-    } catch {
+    } catch(e) {
       this.state.weeks = this.emptyWeeks();
-      localStorage.removeItem('truos_schedule_v34');
     }
     this.state.activeWeek = 0;
     this.render();
     this.bindEvents();
+    // Real-time sync — re-render when another device writes
+    TruDB.on('truos_schedule_v34', function(data) {
+      if (!Array.isArray(data) || data.length !== 2) return;
+      IncomeModule.state.weeks = data;
+      IncomeModule.render();
+      IncomeModule.bindEvents();
+    });
   },
 
   save() {
-    try { localStorage.setItem('truos_schedule_v34', JSON.stringify(this.state.weeks)); } catch(e) {}
+    TruDB.set('truos_schedule_v34', this.state.weeks);
   },
 
   updateDay(wi, day, type, hrs) {
