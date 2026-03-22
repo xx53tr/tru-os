@@ -1,5 +1,5 @@
 # CLAUDE.md — TruOS Project Instructions
-> Last updated: March 2026 · Single source of truth for every session.
+> Last updated: 2026-03-22 · Single source of truth for every session.
 
 ---
 
@@ -38,7 +38,7 @@ Afternoon diff:        +$2.50/hr
 Midnight diff:         +$2.75/hr
 Weekend diff:          +$2.00/hr
 Tax rate:              19.2% effective
-Net per 12hr shift:    $167.84
+Net per 12hr shift:    $172.86
 Biweekly net target:   $2,000
 
 Accounts:
@@ -147,7 +147,7 @@ TruDB.get('path', callback);
 Aggregates data from all other modules. Shows: income gap to target, upcoming assignments with urgency badges, account balance summary, trading terminal status. Badge count = overdue (red) + within-72hr (amber) assignments. Read-only — no data entry.
 
 ### Income (`income.js`)
-Shift scheduler pulling from `IncomeModule.CFG`. OT calculated sequentially (see Section 3). Net per shift used by Finance module shift-to-cost translator — always pull from CFG, never hardcode.
+Shift scheduler pulling from `IncomeModule.CFG`. OT calculated sequentially (see Section 3). Net per shift used by Finance module shift-to-cost translator — always pull from CFG, never hardcode. **Wired to Firebase via TruDB** — shift data syncs cross-device.
 
 ### Academic (`academic.js`)
 Canvas ICS import. Deduplication rule — all three must match to be a duplicate:
@@ -158,7 +158,7 @@ item.cls === current.cls  // ← class must match — different classes can shar
 ```
 Urgency tiers: `overdue` = red · `within 72hr` = amber · `upcoming` = default.
 Week grouping: `Math.floor((dueDate - minDate) / 7) + 1` anchored to earliest due date.
-Completed section: collapsed by default, Purge button requires custom modal confirmation.
+Completed section: collapsed by default, Purge button requires custom modal confirmation. **Wired to Firebase via TruDB** — assignments sync cross-device.
 
 ### Trading (`trading.js`)
 Paper portfolio with live Yahoo Finance prices. **Academic gate — do not remove:**
@@ -185,7 +185,7 @@ pace     = spendPct vs dayPct
 
 **Shift-to-cost translator:**
 ```
-netPerShift = $167.84  (pulled from IncomeModule.CFG — never hardcode)
+netPerShift = $172.86  (pulled from IncomeModule.CFG — never hardcode)
 diningShifts = diningSpend / netPerShift
 ```
 
@@ -231,6 +231,12 @@ diningShifts = diningSpend / netPerShift
 ## 10. MODULAR SPLIT STATUS
 
 Architecture finalized, files generated (`truos-modular.zip`), deploy blocked pending GitHub access. Resume when ready — no logic changes required, just push and point Vercel at `index.html`. Do not re-architect or re-generate — the split is done.
+
+---
+
+## 11b. BOOTSTRAP DATA
+
+February transaction/shift data is baked into a bootstrap script in `index.html`. Do not re-import or overwrite February data — it is already seeded. Any migration or data touch affecting February requires explicit approval.
 
 ---
 
