@@ -377,13 +377,13 @@ select option { background: #141416; }
 /* ═══════════════════════════════════════════
    INCOME MODULE — v3.4 FLUID styles
 ═══════════════════════════════════════════ */
-.inc-wrap { padding: 0 18px 24px; }
+.inc-wrap { padding: max(16px, env(safe-area-inset-top)) 18px 24px; }
 
 /* Progress card */
 .progress-card {
   background: var(--glass); backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border); border-radius: 20px;
-  padding: 18px; margin-bottom: 16px;
+  padding: 12px; margin-bottom: 10px;
 }
 .pc-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
 .pc-net { font-family: var(--mono); font-size: 32px; font-weight: 700; color: var(--green); line-height: 1; }
@@ -395,9 +395,9 @@ select option { background: #141416; }
 .v-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--muted); }
 
 /* Week tabs */
-.week-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.week-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
 .week-tab {
-  flex: 1; padding: 11px; border-radius: 12px;
+  flex: 1; padding: 8px; border-radius: 12px;
   background: var(--glass); border: 1px solid var(--glass-border);
   color: var(--muted); cursor: pointer; font-family: var(--mono);
   font-size: 10px; text-align: center; font-weight: 600; transition: 0.2s;
@@ -409,10 +409,10 @@ select option { background: #141416; }
   display: grid; grid-template-columns: 72px 1fr auto;
   align-items: center; gap: 10px;
   background: var(--glass); border: 1px solid var(--glass-border);
-  border-radius: 14px; padding: 12px 14px; margin-bottom: 8px;
+  border-radius: 12px; padding: 8px 12px; margin-bottom: 5px;
   backdrop-filter: blur(8px);
 }
-.day-name { font-size: 11px; font-weight: 700; color: var(--muted); font-family: var(--mono); letter-spacing: 1px; }
+.day-name { font-size: 10px; font-weight: 700; color: var(--muted); font-family: var(--mono); letter-spacing: 1px; }
 .day-name.on { color: var(--text); }
 
 .tag-row { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
@@ -422,7 +422,7 @@ select option { background: #141416; }
 .tag-wknd   { background: rgba(30,144,255,0.12);  color: var(--blue); }
 .tag-ot     { background: rgba(255,71,87,0.12);   color: var(--red); border: 1px solid rgba(255,71,87,0.25); }
 
-.chip-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.chip-row { display: flex; gap: 4px; margin-bottom: 2px; }
 .chip {
   padding: 5px 9px; border-radius: 6px;
   border: 1px solid var(--glass-border); background: rgba(255,255,255,0.04);
@@ -433,7 +433,7 @@ select option { background: #141416; }
 .chip.active-w { border-color: var(--amber); color: var(--amber); background: rgba(245,166,35,0.08); }
 .chip-remove { color: var(--red); border: none; background: transparent; cursor: pointer; font-size: 16px; padding: 2px 8px; line-height: 1; }
 
-.day-earn { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--muted); text-align: right; white-space: nowrap; }
+.day-earn { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--muted); text-align: right; white-space: nowrap; }
 .day-earn.on { color: var(--green); }
 
 /* Clear row */
@@ -497,7 +497,7 @@ select option { background: #141416; }
 
 /* ── Sync badge ── */
 .sync-badge {
-  position: fixed; top: 12px; right: 14px;
+  position: fixed; top: max(12px, env(safe-area-inset-top)); right: 14px;
   font-family: var(--mono); font-size: 8px; letter-spacing: 1.5px;
   color: var(--muted); z-index: 1000; pointer-events: none;
   transition: color 0.4s;
