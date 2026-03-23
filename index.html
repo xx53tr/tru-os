@@ -377,13 +377,13 @@ select option { background: #141416; }
 /* ═══════════════════════════════════════════
    INCOME MODULE — v3.4 FLUID styles
 ═══════════════════════════════════════════ */
-.inc-wrap { padding: max(16px, env(safe-area-inset-top)) 18px 24px; }
+.inc-wrap { padding: max(16px, env(safe-area-inset-top)) 18px 0; }
 
 /* Progress card */
 .progress-card {
   background: var(--glass); backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border); border-radius: 20px;
-  padding: 12px; margin-bottom: 8px;
+  padding: 12px; margin-bottom: 4px;
 }
 .pc-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
 .pc-net { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--green); line-height: 1; }
@@ -395,9 +395,9 @@ select option { background: #141416; }
 .v-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--muted); }
 
 /* Week tabs */
-.week-tabs { display: flex; gap: 8px; margin-bottom: 6px; }
+.week-tabs { display: flex; gap: 8px; margin-bottom: 4px; }
 .week-tab {
-  flex: 1; padding: 8px; border-radius: 12px;
+  flex: 1; padding: 6px; border-radius: 12px;
   background: var(--glass); border: 1px solid var(--glass-border);
   color: var(--muted); cursor: pointer; font-family: var(--mono);
   font-size: 10px; text-align: center; font-weight: 600; transition: 0.2s;
@@ -409,20 +409,20 @@ select option { background: #141416; }
   display: grid; grid-template-columns: 72px 1fr auto;
   align-items: center; gap: 10px;
   background: var(--glass); border: 1px solid var(--glass-border);
-  border-radius: 12px; padding: 8px 12px; margin-bottom: 5px;
+  border-radius: 12px; padding: 5px 10px; margin-bottom: 3px;
   backdrop-filter: blur(8px);
 }
 .day-name { font-size: 10px; font-weight: 700; color: var(--muted); font-family: var(--mono); letter-spacing: 1px; }
 .day-name.on { color: var(--text); }
 
-.tag-row { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.tag-row { display: flex; gap: 4px; margin-top: 2px; flex-wrap: wrap; }
 .tag { font-size: 8px; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
 .tag-base   { background: rgba(46,213,115,0.12); color: var(--green); }
 .tag-pickup { background: rgba(245,166,35,0.12);  color: var(--amber); }
 .tag-wknd   { background: rgba(30,144,255,0.12);  color: var(--blue); }
 .tag-ot     { background: rgba(255,71,87,0.12);   color: var(--red); border: 1px solid rgba(255,71,87,0.25); }
 
-.chip-row { display: flex; gap: 4px; margin-bottom: 2px; }
+.chip-row { display: flex; gap: 4px; margin-bottom: 0; }
 .chip {
   padding: 5px 9px; border-radius: 6px;
   border: 1px solid var(--glass-border); background: rgba(255,255,255,0.04);
@@ -1049,29 +1049,13 @@ const IncomeModule = {
           </div>
           <div class="v-bar"><div class="v-fill" style="width:${pct}%"></div></div>
           <div class="v-meta">
-            <span>${combined.hrs}H scheduled</span>
+            <span>${combined.hrs}H &nbsp;·&nbsp; $${Math.round(combined.gross)} gross</span>
             <span style="color:${gapColor}">${gapText}</span>
           </div>
         </div>
 
-        <!-- Stats -->
-        <div class="stats-bar" style="padding:0 0 8px">
-          <div class="stat">
-            <span class="stat-val" style="color:var(--green)">$${Math.round(combined.net)}</span>
-            <span class="stat-sub">Net Pay</span>
-          </div>
-          <div class="stat">
-            <span class="stat-val" style="color:var(--amber)">$${Math.round(combined.gross)}</span>
-            <span class="stat-sub">Gross</span>
-          </div>
-          <div class="stat">
-            <span class="stat-val" style="color:var(--muted)">${combined.hrs}H</span>
-            <span class="stat-sub">Hours</span>
-          </div>
-        </div>
-
         <!-- Week tabs + clear -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div class="sys-label">Schedule Builder</div>
           <button class="clear-btn" data-action="clear-all">CLEAR</button>
         </div>
