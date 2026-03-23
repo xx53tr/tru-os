@@ -436,6 +436,12 @@ select option { background: #141416; }
 .day-earn { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--muted); text-align: right; white-space: nowrap; }
 .day-earn.on { color: var(--green); }
 
+/* Compact stats bar (income-scoped) */
+.inc-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-bottom: 4px; }
+.inc-stat { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 10px; padding: 4px 8px; text-align: center; }
+.inc-stat-val { font-family: var(--mono); font-size: 13px; font-weight: 700; display: block; line-height: 1; }
+.inc-stat-sub { font-family: var(--mono); font-size: 7px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-top: 1px; display: block; }
+
 /* Clear row */
 .inc-clear-row { display: flex; justify-content: flex-end; margin-bottom: 4px; }
 
@@ -1049,8 +1055,24 @@ const IncomeModule = {
           </div>
           <div class="v-bar"><div class="v-fill" style="width:${pct}%"></div></div>
           <div class="v-meta">
-            <span>${combined.hrs}H &nbsp;·&nbsp; $${Math.round(combined.gross)} gross</span>
+            <span>${combined.hrs}H scheduled</span>
             <span style="color:${gapColor}">${gapText}</span>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="inc-stats">
+          <div class="inc-stat">
+            <span class="inc-stat-val" style="color:var(--green)">$${Math.round(combined.net)}</span>
+            <span class="inc-stat-sub">Net Pay</span>
+          </div>
+          <div class="inc-stat">
+            <span class="inc-stat-val" style="color:var(--amber)">$${Math.round(combined.gross)}</span>
+            <span class="inc-stat-sub">Gross</span>
+          </div>
+          <div class="inc-stat">
+            <span class="inc-stat-val" style="color:var(--muted)">${combined.hrs}H</span>
+            <span class="inc-stat-sub">Hours</span>
           </div>
         </div>
 
