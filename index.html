@@ -892,7 +892,8 @@ const IncomeModule = {
       if (block.hrs <= 0) return;
       const regInBlock = Math.min(block.hrs, Math.max(0, otThreshold - runningCumHrs));
       const otInBlock  = block.hrs - regInBlock;
-      shiftTotal      += (regInBlock * block.rate) + (otInBlock * block.rate * 1.5);
+      const blockDiff  = block.rate - baseRate;
+      shiftTotal      += (regInBlock * block.rate) + (otInBlock * baseRate * 1.5) + (otInBlock * blockDiff);
       runningCumHrs   += block.hrs;
     });
     return shiftTotal;
