@@ -512,7 +512,6 @@ select option { background: #141416; }
 <div id="shell-toast"></div>
 <div id="sync-badge" class="sync-badge">○ OFFLINE</div>
 <div id="main-content"></div>
-<button class="export-btn" onclick="Shell.exportState()" title="Export with data">⬇ EXPORT</button>
 
 <nav class="shell-nav" id="shell-nav">
   <div class="nav-tab active" data-mod="dashboard">
@@ -996,7 +995,7 @@ const IncomeModule = {
       const isOn = s.type !== 'off';
       const tagType = s.type === 'wknd' ? 'wknd' : s.type === 'base' ? 'base' : 'pickup';
 
-      const typeChips = ['base','pickup','wknd'].map(t => {
+      const typeChips = ['base','wknd'].map(t => {
         const active = s.type === t;
         const cls = active ? (t === 'wknd' ? 'chip active-w' : 'chip active') : 'chip';
         return `<button class="${cls}" data-action="set-type" data-day="${day}" data-type="${t}" data-hrs="${s.hrs}">${t[0].toUpperCase()}</button>`;
@@ -1033,16 +1032,6 @@ const IncomeModule = {
     const gapText  = remaining > 0 ? `GAP: -$${this.fmt(remaining)}` : '✓ GOAL REACHED';
 
     mount(`
-      <header class="mod-header">
-        <div>
-          <span class="sys-label">TruOS · Module 01</span>
-          <h1 class="mod-title">Income<br><em>Optimizer</em></h1>
-        </div>
-        <div style="text-align:right">
-          <div class="sys-label" id="inc-date"></div>
-          <div style="font-family:var(--mono);font-size:18px;font-weight:700;" id="inc-time"></div>
-        </div>
-      </header>
 
       <div class="inc-wrap">
 
@@ -1060,7 +1049,7 @@ const IncomeModule = {
           </div>
           <div class="v-bar"><div class="v-fill" style="width:${pct}%"></div></div>
           <div class="v-meta">
-            <span>${pct.toFixed(1)}% complete · ${combined.hrs}H scheduled</span>
+            <span>${combined.hrs}H scheduled</span>
             <span style="color:${gapColor}">${gapText}</span>
           </div>
         </div>
