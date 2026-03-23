@@ -121,10 +121,10 @@ body::before {
 .stat {
   background: var(--glass); backdrop-filter: blur(10px);
   border: 1px solid var(--glass-border); border-radius: 16px;
-  padding: 12px 10px; text-align: center;
+  padding: 8px 10px; text-align: center;
 }
-.stat-val { font-family: var(--mono); font-size: 21px; font-weight: 700; display: block; line-height: 1; }
-.stat-sub { font-family: var(--mono); font-size: 8px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-top: 4px; display: block; }
+.stat-val { font-family: var(--mono); font-size: 17px; font-weight: 700; display: block; line-height: 1; }
+.stat-sub { font-family: var(--mono); font-size: 8px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-top: 2px; display: block; }
 
 .pill-row { padding: 8px 20px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .pill-row::-webkit-scrollbar { display: none; }
@@ -383,10 +383,10 @@ select option { background: #141416; }
 .progress-card {
   background: var(--glass); backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border); border-radius: 20px;
-  padding: 12px; margin-bottom: 10px;
+  padding: 12px; margin-bottom: 8px;
 }
-.pc-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
-.pc-net { font-family: var(--mono); font-size: 32px; font-weight: 700; color: var(--green); line-height: 1; }
+.pc-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
+.pc-net { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--green); line-height: 1; }
 .pc-net sup { font-size: 14px; vertical-align: super; }
 .pc-target { text-align: right; }
 .pc-target-val { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--muted); }
@@ -395,7 +395,7 @@ select option { background: #141416; }
 .v-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--muted); }
 
 /* Week tabs */
-.week-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.week-tabs { display: flex; gap: 8px; margin-bottom: 6px; }
 .week-tab {
   flex: 1; padding: 8px; border-radius: 12px;
   background: var(--glass); border: 1px solid var(--glass-border);
@@ -499,7 +499,7 @@ select option { background: #141416; }
 .sync-badge {
   position: fixed; top: max(12px, env(safe-area-inset-top)); right: 14px;
   font-family: var(--mono); font-size: 8px; letter-spacing: 1.5px;
-  color: var(--muted); z-index: 1000; pointer-events: none;
+  color: var(--muted); z-index: 9999; pointer-events: none;
   transition: color 0.4s;
 }
 .sync-badge.online  { color: var(--green); }
@@ -1055,7 +1055,7 @@ const IncomeModule = {
         </div>
 
         <!-- Stats -->
-        <div class="stats-bar" style="padding:0 0 16px">
+        <div class="stats-bar" style="padding:0 0 8px">
           <div class="stat">
             <span class="stat-val" style="color:var(--green)">$${Math.round(combined.net)}</span>
             <span class="stat-sub">Net Pay</span>
@@ -1071,7 +1071,7 @@ const IncomeModule = {
         </div>
 
         <!-- Week tabs + clear -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <div class="sys-label">Schedule Builder</div>
           <button class="clear-btn" data-action="clear-all">CLEAR</button>
         </div>
